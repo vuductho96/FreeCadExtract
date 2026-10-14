@@ -1,0 +1,17 @@
+{
+  "name": "dimension-ocr",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "onnxruntime-web": "^1.22.0",
+    "pdfjs-dist": "^4.10.38"
+  },
+  "type": "module"
+}
