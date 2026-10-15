@@ -31,3 +31,5 @@ await assert.rejects(buildSolid({profile:[[0,0],[10,10],[0,10],[10,0]],depth:4})
 console.log(JSON.stringify({passed:true,metrics,triangles:mesh.triangles.length/3,stepBytes:step.size,stlBytes:stl.size,stepRoundtrip:true}));
 imported.delete(); shape.delete();
 
+
+const cylinder=await buildSolid({profile:[[-5,-5],[5,-5],[5,5],[-5,5]],circle:{center:[0,0],radius:5},depth:10});assert.ok(Math.abs(cylinder.metrics.volume-Math.PI*250)<1e-5);assert.equal(cylinder.metrics.valid,true);cylinder.shape.delete();console.log('Exact circular sketch / cylindrical Pad passed.');

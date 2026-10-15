@@ -1,3 +1,6 @@
 node_modules/
 *.tar.gz
 dist/test-fixture.png
+
+design-qa.md
+

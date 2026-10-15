@@ -38,3 +38,13 @@ STEP/STL are computed locally via Replicad/OpenCascade WASM in a worker. FreeCAD
 
 Real OpenCascade tests cover a stepped outline, holes on all axes, pockets, edge treatments, invalid sketches and STEP round-trip topology/volume. Browser QA covers example→confirm→solid, overlay, cube navigation, mapping, exports and responsive layouts.
 Vendor licensing notices are in `dist/vendor/cad/`.
+
+## Compact CAD workbench
+
+The 3D tab now uses a FreeCAD-style layout: Model tree and Data properties at left, a large shared sketch/model viewport with ViewCube, toolbars above and Tasks at right. It is an independent browser CAD interface with a deliberately smaller command set, not the FreeCAD application itself.
+
+Start **New sketch**, choose Line (closed polyline), Rectangle or Circle. Set exact sketch width/height or circle diameter in Tasks, then **Pad**, set length and **Apply / Recompute**. Circle Pad uses a real analytic circular profile in OpenCascade. The workbench currently supports one active XY base sketch/body. A new sketch starts a new body document.
+
+**Pocket**: set Pocket depth in Tasks, drag a rectangular region in Top sketch, then recompute. **Hole**: click center and radius in the Top sketch, or use the numerical feature dialog. Fillet/chamfer apply globally to eligible edges. Undo/Redo restore sketch/feature parameters; recompute refreshes the solid. Complete FreeCAD constraint solving, multiple bodies, arbitrary support planes and per-edge treatments are outside this compact workbench.
+
+Drawing reference, original crop mapping, OCR and calibration remain under the expandable Drawing reference panel. Exports stay local. The compact workbench keeps working data in memory after export by default so multiple formats can be saved; Clear session after downloading remains available.
