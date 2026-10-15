@@ -6,7 +6,7 @@ Public browser application for extracting drawing dimensions and assisted 2D-to-
 
 Install Node.js, then run `npm ci` and `npm start`. Open http://127.0.0.1:5173.
 All production assets, including OCR models and OpenCascade WASM, are committed in `dist/`.
-No backend or cloud drawing storage is used. HTTPS or localhost is required for workers.
+OCR and CAD run locally. The optional Gemini workflow sends only selected crops directly to Google; no application backend stores the drawing. HTTPS or localhost is required for workers.
 `npm run prepare:cad` refreshes CAD vendor assets from pinned dependencies.
 The existing OCR asset preparation script expects the original local model files; it is not needed to run the committed site.
 
@@ -32,7 +32,7 @@ Try 3-view example supplies a60×40×20mm stepped prismatic part with an8mm thro
 
 This first release is **assisted prismatic reconstruction**, not arbitrary automatic drawing interpretation. Profiles are line segments. Curved contours are proposed as polygon vertices; true arc fitting, robust center/hidden-line semantics and general assemblies are not implemented. Front/Right constrain extents and support visual verification; hidden features must be entered and confirmed by the user. Projection selection changes placement guidance, not the manually assigned coordinate axes. Overlay projects visible and hidden mesh edges together; it is not a hidden-line-removal drawing engine.
 
-STEP/STL are computed locally via Replicad/OpenCascade WASM in a worker. FreeCAD Python/CadQuery/build123d are not running in the browser; FCStd uses the generated macro in native FreeCAD. No file, crop, OCR result or model is uploaded. Working data lives in memory until Clear session, reload or close. Downloads remain on the user's device.
+STEP/STL are computed locally via Replicad/OpenCascade WASM in a worker. FreeCAD Python/CadQuery/build123d are not running in the browser; FCStd uses the generated macro in native FreeCAD. OCR and local CAD do not upload source drawings. The optional Gemini workflow sends user-selected cropped images to Google for inference, under Google API data terms. Working data lives in memory until Clear session, reload or close. Downloads remain on the user's device.
 
 ## Validation
 
@@ -48,3 +48,17 @@ Start **New sketch**, choose Line (closed polyline), Rectangle or Circle. Set ex
 **Pocket**: set Pocket depth in Tasks, drag a rectangular region in Top sketch, then recompute. **Hole**: click center and radius in the Top sketch, or use the numerical feature dialog. Fillet/chamfer apply globally to eligible edges. Undo/Redo restore sketch/feature parameters; recompute refreshes the solid. Complete FreeCAD constraint solving, multiple bodies, arbitrary support planes and per-edge treatments are outside this compact workbench.
 
 Drawing reference, original crop mapping, OCR and calibration remain under the expandable Drawing reference panel. Exports stay local. The compact workbench keeps working data in memory after export by default so multiple formats can be saved; Clear session after downloading remains available.
+
+## Current focused crop → Gemini → 3D workflow
+
+The FreeCAD dock arrangement is retained, while manual Sketcher/Pad/feature commands are removed from the visible workflow. Open drawing, Pan, Crop view, rotate/flip crop, Fit and model viewing remain. The task panel accepts the user's own Gemini API key for the current session only. Never commit a key or put one in source.
+
+1. Crop1–12 views or detail images. Labels may be Auto, Front/Top/Right/etc., Isometric or Detail. The isometric view is not an extra orthographic cube face.
+2. Tick crops to send. Optionally choose drawing units and add notes. No calibration or minimum number of orthographic views is required for AI reconstruction.
+3. Enter a key from https://aistudio.google.com/api-keys and click Gemini dựng3D. The fixed Google generateContent endpoint receives only the selected PNG crops and drawing metadata. No Files API, app cloud storage or backend proxy is used in this BYOK prototype. The key is sent in x-goog-api-key, never a URL, storage or model export. Clear/reload/close removes it.
+4. Gemini returns declarative JSON geometry and explicit assumptions/missing views. The user permits inferred hidden geometry and dimensions. The app automatically builds a draft through the existing OpenCascade worker, validates a single solid and shows assumptions. Unsupported features must be listed; no AI code is executed.
+5. Inspect the draft before STEP/STL export. The AI proposal and assumptions are included with model JSON.
+
+Default model: gemini-3.8-flash, documented as free-tier eligible on2026-10-15. The free tier requires a key, has project quotas and can use content to improve Google products. Actual charging depends on the user's Google project/tier. The app does not enable billing, silently switch models or promise unlimited free use. Model ID is editable in case availability differs by project. Official docs: https://ai.google.dev/gemini-api/docs/pricing and https://ai.google.dev/gemini-api/docs/rate-limits .
+
+Integration tests use a mocked Google transport, test key/header isolation, quota/truncation failures and strict schema validation, then build/validate a real solid and STEP from the offline proposal. Browser QA covers4 crops with Isometric and an offline one-view proposal (no3-view gate). No live Google inference was tested because no user API key was supplied to the agent.
