@@ -37,3 +37,26 @@
 .fc-modal-help th,.fc-modal-help td{padding:6px 8px;border-bottom:1px solid #eee;text-align:left;font-size:12px}
 .fc-modal-help kbd{background:#f1f3f5;border:1px solid #ced4da;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:11px}
 
+.ai-toolbar-button {
+  background: #182822 !important;
+  border: 1px solid #20c997 !important;
+  color: #20c997 !important;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+.ai-toolbar-button:hover {
+  background: #20c99733 !important;
+}
+#hybrid-ai-panel {
+  background: #181d24;
+  border: 1px solid #2e3846;
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 12px;
+}
+

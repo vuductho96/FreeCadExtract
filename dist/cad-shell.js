@@ -19,6 +19,7 @@ shell.innerHTML = `
   <button data-menu="view">View</button>
   <button data-menu="sketch">Sketch</button>
   <button data-menu="part">Part Design</button>
+  <button data-menu="ai">🧠 AI 2D→3D</button>
   <button data-menu="help">Help</button>
   <span class="document-title" id="fc-doc-name">Unnamed.FCStd</span>
   <span class="local-state" id="fc-local-status">● Web CAD Standalone</span>
@@ -26,6 +27,9 @@ shell.innerHTML = `
 
 <div class="cad-toolbar">
   <div class="tool-group" id="file-tools"></div>
+  <div class="tool-group" id="ai-tools">
+    <button data-command="hybrid-reconstruct" id="btn-hybrid-reconstruct" class="ai-toolbar-button" title="🧠 Hybrid AI: Suy luận và dựng 3D từ các mặt chiếu bản vẽ"><img src="vendor/cad/icons/cube.svg"><span style="color:#20c997;font-weight:600;margin-left:4px;">🧠 AI 2D→3D</span></button>
+  </div>
   
   <div class="tool-group" id="history-group">
     <button data-command="undo" title="Undo (Ctrl+Z)" aria-label="Undo"><img src="vendor/cad/icons/arrow-back-up.svg"></button>
@@ -239,6 +243,11 @@ const menus = {
     ['Fillet 3D', 'fillet'],
     ['Chamfer 3D', 'chamfer'],
     ['Recompute Solid (F5)', 'recompute']
+  ],
+  ai: [
+    ['🧠 Dựng 3D tự động (Hybrid AI)', 'hybrid-reconstruct'],
+    ['🔍 Phân tích mặt chiếu đã chọn', 'analyze-crop'],
+    ['📐 Đọc kích thước bản vẽ (Local OCR)', 'ocr-dimensions']
   ],
   help: [
     ['FreeCAD Shortcuts & Tips', 'help']

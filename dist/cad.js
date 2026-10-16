@@ -2,6 +2,7 @@
 import {mountLocalFreecad} from './freecad-local.js';
 // import {validateProposal} from './gemini-cad.js';
 import {FreeCadSketcher} from './freecad-sketcher.js';
+import {extractViewFeatures, solveMultiViewGeometry} from './hybrid-cad-solver.js';
 import './cad-shell.js';
 import * as pdfjs from './vendor/pdf.mjs';
 import {OcrClient} from './ocr-client.js';
@@ -1111,7 +1112,163 @@ document.addEventListener('cad-command', e => {
     $('export-source')?.click();
     return;
   }
+  if (cmd === 'hybrid-reconstruct') return runHybridReconstruction();
+  if (cmd === 'analyze-crop') return runAnalyzeCurrentCrop();
+  if (cmd === 'ocr-dimensions') return runOcrDimensions();
 });
+
+export async function runHybridReconstruction() {
+  if (kernelBusy) return status('CAD kernel đang bận. Vui lòng chờ...');
+  if (!crops.length) {
+    status('Hãy mở bản vẽ kỹ thuật hoặc tạo vùng Crop hình chiếu (Top, Front, Right) trước khi dựng 3D.');
+    return;
+  }
+
+  status('Đang phân tích hình học các mặt chiếu (Deterministic CV + Spatial Reasoning)…');
+  document.querySelector('.cad-docks').classList.add('show-tasks');
+  const taskContent = $('tasks-content');
+
+  let aiPanel = $('hybrid-ai-panel');
+  if (!aiPanel) {
+    aiPanel = document.createElement('div');
+    aiPanel.id = 'hybrid-ai-panel';
+    taskContent.prepend(aiPanel);
+  }
+  aiPanel.innerHTML = `
+    <div class="dock-title">🧠 Hybrid AI · 2D → 3D Reconstruction</div>
+    <p class="muted">Đang phân tích ${crops.length} mặt chiếu, bóc tách biên dạng và giải hệ phương trình hình chiếu...</p>
+    <div style="margin:8px 0;color:#20c997;font-size:12px;">● Đang phân tích...</div>
+  `;
+
+  try {
+    const viewFeatures = crops.map(c => extractViewFeatures(c));
+    const solution = solveMultiViewGeometry(viewFeatures, {
+      defaultDepth: Number($('model-height').value) || 20
+    });
+
+    aiPanel.innerHTML = `
+      <div class="dock-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🧠 Hybrid AI · 2D → 3D</span>
+        <span class="pill" style="background:#20c99722;color:#20c997;border:1px solid #20c997;padding:2px 6px;border-radius:3px;font-size:10px;">LOCAL PIPELINE</span>
+      </div>
+      <p style="margin:6px 0;font-weight:600;color:#fff;font-size:12px;">${solution.summary}</p>
+      <div style="background:#1e222b;border:1px solid #363d4d;border-radius:4px;padding:8px;font-size:11px;line-height:1.5;max-height:160px;overflow-y:auto;margin-bottom:8px;">
+        <strong style="color:#adb5bd;display:block;margin-bottom:4px;">Trình tự suy luận hình học:</strong>
+        <ul style="margin:0;padding-left:16px;color:#d0d7de;">
+          ${solution.reasoning.map(r => `<li>${r}</li>`).join('')}
+        </ul>
+        ${solution.assumptions.length ? `
+          <strong style="color:#e0a82e;display:block;margin-top:6px;">Giả định / Phần suy đoán:</strong>
+          <ul style="margin:0;padding-left:16px;color:#e0a82e;">
+            ${solution.assumptions.map(a => `<li>${a}</li>`).join('')}
+          </ul>
+        ` : ''}
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <button id="btn-re-solve" class="button" style="flex:1;">Phân tích lại</button>
+        <button id="btn-edit-sketch" class="button" style="flex:1;">Sửa phác thảo 2D</button>
+      </div>
+    `;
+
+    $('btn-re-solve').onclick = () => runHybridReconstruction();
+    $('btn-edit-sketch').onclick = () => switchView('sketch');
+
+    profile = solution.spec.profile;
+    circleProfile = solution.spec.circle || null;
+    profileClosed = true;
+    holes = solution.spec.holes || [];
+    pockets = solution.spec.pockets || [];
+    $('model-height').value = solution.spec.depth;
+
+    sketcher.loadProfile(profile);
+    featureList();
+    invalidate();
+    updateTree();
+
+    status('Biên dạng hợp lệ. Đang dựng khối 3D với OpenCascade WASM kernel…');
+    if (solution.method === 'revolve') {
+      await revolveSolid();
+    } else {
+      $('confirm-geometry').checked = true;
+      await $('build-solid').onclick();
+    }
+
+    status('✓ Dựng 3D thành công bằng Hybrid AI! Mô hình đã sẵn sàng trong 3D Viewport.');
+  } catch (err) {
+    console.error(err);
+    aiPanel.innerHTML = `
+      <div class="dock-title">🧠 Hybrid AI · Thông báo</div>
+      <p style="color:#ff6b6b;font-size:12px;">${err.message}</p>
+      <button id="btn-retry-solve" class="button">Thử lại</button>
+    `;
+    $('btn-retry-solve').onclick = () => runHybridReconstruction();
+    status('Lỗi suy luận hình học: ' + err.message);
+  }
+}
+
+export function runAnalyzeCurrentCrop() {
+  const cr = active();
+  if (!cr) return status('Hãy chọn một vùng Crop hình chiếu để phân tích.');
+  status(`Đang phân tích chi tiết hình học Crop #${cr.id} (${cr.face || 'Auto'})…`);
+  const feat = extractViewFeatures(cr);
+
+  $('analysis').textContent = `Crop #${cr.id} (${cr.face || 'Auto'}):\n` +
+    `- Tìm thấy ${feat.outlines.length} đường bao đa giác kín (chu vi ngoài: ${feat.primaryOutline?.points.length || 0} đỉnh).\n` +
+    `- Tìm thấy ${feat.circles.length} đường tròn/lỗ: ${feat.circles.map(c => `Ø${c.diameter.toFixed(1)}`).join(', ') || 'Không có'}.\n` +
+    `- Kích thước bao: ${feat.bounds.width.toFixed(2)} × ${feat.bounds.height.toFixed(2)} mm.`;
+
+  const candHost = $('ocr-candidates');
+  candHost.replaceChildren();
+  feat.outlines.forEach((o, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'button';
+    btn.style.margin = '2px';
+    btn.textContent = `Nạp biên dạng ${i + 1} (${o.points.length} đỉnh)`;
+    btn.onclick = () => {
+      profile = o.points;
+      profileClosed = true;
+      sketcher.loadProfile(profile);
+      invalidate();
+      status(`Đã nạp biên dạng ${i + 1} vào 2D Sketcher.`);
+    };
+    candHost.append(btn);
+  });
+
+  feat.circles.forEach((c) => {
+    const btn = document.createElement('button');
+    btn.className = 'button';
+    btn.style.margin = '2px';
+    btn.textContent = `Thêm lỗ Ø${c.diameter.toFixed(1)}`;
+    btn.onclick = () => {
+      holes.push({ axis: 'Z', x: c.x, y: c.y, z: 0, radius: c.radius });
+      featureList();
+      invalidate();
+      status(`Đã thêm lỗ Ø${c.diameter.toFixed(1)} tại (${c.x.toFixed(1)}, ${c.y.toFixed(1)}).`);
+    };
+    candHost.append(btn);
+  });
+
+  document.querySelector('.cad-docks').classList.add('show-tasks');
+}
+
+export async function runOcrDimensions() {
+  const cr = active();
+  if (!cr) return status('Chọn một vùng Crop để đọc kích thước.');
+  status('Đang chạy OCR nhận diện số đo kích thước trên thiết bị…');
+  try {
+    const ocr = new OcrClient();
+    const result = await ocr.extract(cr.canvas);
+    status(`Đã đọc ${result.items?.length || 0} thông số kích thước từ bản vẽ.`);
+    $('analysis').textContent += `\n\nKích thước phát hiện qua OCR:\n` +
+      (result.items || []).map(it => `${it.text} (tin cậy: ${(it.confidence * 100).toFixed(0)}%)`).join(', ');
+  } catch (e) {
+    status('Lỗi OCR: ' + e.message);
+  }
+}
+
+if ($('analyze')) $('analyze').onclick = runAnalyzeCurrentCrop;
+if ($('ocr-dimensions')) $('ocr-dimensions').onclick = runOcrDimensions;
+
 
 // Keyboard Shortcuts
 document.addEventListener('keydown', e => {
