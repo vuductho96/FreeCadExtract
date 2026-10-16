@@ -47,7 +47,7 @@ export const CHATGPT_PROMPT=`Phân tích các crop bản vẽ kỹ thuật tôi 
 2. Dùng mm, Sketcher có ràng buộc thật và PartDesign Pad/Pocket/Hole/Fillet/Chamfer phù hợp. Không thay chi tiết bằng khối hộp bao.
 3. Trả về MỘT khối code Python hoàn chỉnh để copy. Không dùng pip, terminal, API key, yêu cầu input() hay hộp thoại tương tác.
 4. Dùng doc = App.ActiveDocument (website tạo tài liệu mới mặc định). Import FreeCAD as App, Part, Sketcher. Không đóng hoặc sửa tài liệu khác; không tự ghi file hoặc truy cập mạng.
-5. Đặt tham số có tên ở đầu mã. Recompute sau feature; ẩn Sketch/feature cũ và chỉ hiện kết quả cuối.
+5. Cần file FCStd sửa được: giữ Sketch, ràng buộc và cây feature PartDesign có tên; không gộp toàn bộ thành một Part::Feature tĩnh. Dùng expression hoặc Spreadsheet cho kích thước dùng lại nếu cần. Đặt tham số có tên ở đầu mã. Recompute sau feature; ẩn Sketch/feature cũ và chỉ hiện kết quả cuối.
 6. Kiểm tra Shape.isValid(), số solid và in kết quả bằng print(). Ghi rõ phần chưa xác nhận; không tự khẳng định đúng dung sai.
 7. Mã chạy trên FreeCAD của máy tôi. Website sẽ đồng bộ 3D; FCStd/STEP/STL được xuất bằng nút trên web. Nếu thiếu dữ kiện quan trọng, hỏi tôi trước khi sinh mô hình cuối.`;
 

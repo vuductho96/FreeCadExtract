@@ -31,6 +31,15 @@ doc.saveAs(${JSON.stringify(join(temp,'code.FCStd'))})
 Part.export([obj],${JSON.stringify(join(temp,'code.step'))})
 s=Part.Shape();s.read(${JSON.stringify(join(temp,'code.step'))})
 assert s.isValid() and len(s.Solids)==1 and abs(s.Volume-obj.Shape.Volume)<1e-6
+App.closeDocument(doc.Name)
+doc=App.openDocument(${JSON.stringify(join(temp,'code.FCStd'))})
+obj=doc.getObject('Pocket')
+obj.Length=2
+doc.recompute()
+assert obj.Shape.isValid() and abs(obj.Shape.Volume-(8000-math.pi*9*2))<1e-6
+assert doc.getObject('BaseSketch').FullyConstrained and doc.getObject('PocketSketch').FullyConstrained
+obj.Length=4
+doc.recompute()
 before=len(App.listDocuments())
 _mcp_result={}
 exec(${JSON.stringify(executionCode('def invalid(:\n    pass',{name:'ShouldNotCreate'}))})
@@ -43,7 +52,7 @@ assert 'before failure' in failure['stdout']
 _mcp_result={}
 exec(${JSON.stringify(executionCode('print("x" * 50000)',{newDocument:false}))})
 assert len(_mcp_result['result']['stdout'])<=20000
-with open(${JSON.stringify(report)},'w') as f:json.dump({'ok':True,'valid':True,'solids':1,'volume':obj.Shape.Volume,'fullyConstrainedSketches':2,'stepRoundtrip':True,'syntaxErrorsCaptured':True,'runtimeErrorsCaptured':True,'stdoutBounded':True},f)
+with open(${JSON.stringify(report)},'w') as f:json.dump({'ok':True,'valid':True,'solids':1,'volume':obj.Shape.Volume,'fullyConstrainedSketches':2,'fcstdReopenAndEdit':True,'stepRoundtrip':True,'syntaxErrorsCaptured':True,'runtimeErrorsCaptured':True,'stdoutBounded':True},f)
 os._exit(0)
 `;
 try{

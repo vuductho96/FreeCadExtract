@@ -1,3 +1,4 @@
+import {mountCodeLayout} from './cad-code-layout.js';
 // import {mountGeminiPanel} from './gemini-panel.js';
 import {mountLocalFreecad} from './freecad-local.js';
 // import {validateProposal} from './gemini-cad.js';
@@ -1460,3 +1461,5 @@ export const aiChat = mountAiChat($('ai-chat-container'), {
 
 // Auto-start blank FreeCAD sketch so user can immediately draw
 newSketch();
+
+mountCodeLayout();
