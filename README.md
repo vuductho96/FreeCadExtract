@@ -57,3 +57,9 @@ STEP giữ solid hình học, không khôi phục Sketch/ràng buộc/lịch s�
 ## Cloudflare edition
 
 This folder also supports Cloudflare Workers Static Assets. See CLOUDFLARE.md before publishing. The assets directory for Wrangler is .cloudflare/public, built from dist. Cloudflare hosting is optional; source and local workflow stay usable without ChatGPT Plus. Do not commit .wrangler credentials or .dev.vars. Always configure the exact deployed origin for downloadable native bridges.
+
+## Unified startup
+
+Double-click **StartApp.bat** for website + FreeCAD + macro + bridge in ONE controller window; no second CMD is needed. StartWeb.bat runs only the website. StartCAD.bat runs website + SolidWorks/SketchUp bridge. Old CMD files forward to these launchers.
+
+When an exact public origin is configured in local-bridge/site-config.json, StartApp uses that hosted website; otherwise it starts localhost:5174. Keep the controller open. Ctrl+C stops only its own services and leaves native documents open. Nothing is deployed by these BAT files.

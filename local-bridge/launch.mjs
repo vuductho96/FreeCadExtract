@@ -21,7 +21,7 @@ export async function launch({check=false,openBrowser=true}={}){
   if(!exe)throw Error('Khong tim thay FreeCAD. Cai FreeCAD tu trang chinh thuc hoac dat FREECAD_EXE den FreeCAD.exe da co.');
   console.log('Dang mo FreeCAD va macro. Neu da co cua so FreeCAD, cua so do van giu nguyen.');
   const app=spawn(exe,[join(folder,'FreeCAD-Web.FCMacro')],{windowsHide:true,stdio:'ignore'});
-  app.on('error',e=>console.error('FreeCAD: '+e.message));
+  app.on('error',e=>console.error('FreeCAD: '+e.message));app.unref();
   let found=false;for(let i=0;i<60;i++){if(await socketReady(12345)){found=true;break;}await new Promise(r=>setTimeout(r,1000));}
   if(!found)throw Error('FreeCAD chua san sang sau 60 giay. Mo macro FreeCAD-Web.FCMacro trong thu muc nay va bam Execute, roi chay lai.');
  }
