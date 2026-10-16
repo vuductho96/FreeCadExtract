@@ -3,6 +3,7 @@ import {mountLocalFreecad} from './freecad-local.js';
 // import {validateProposal} from './gemini-cad.js';
 import {FreeCadSketcher} from './freecad-sketcher.js';
 import {extractViewFeatures, solveMultiViewGeometry} from './hybrid-cad-solver.js';
+import {mountAiChat} from './freecad-ai-chat.js';
 import './cad-shell.js';
 import * as pdfjs from './vendor/pdf.mjs';
 import {OcrClient} from './ocr-client.js';
@@ -1112,7 +1113,11 @@ document.addEventListener('cad-command', e => {
     $('export-source')?.click();
     return;
   }
-  if (cmd === 'hybrid-reconstruct') return runHybridReconstruction();
+  if (cmd === 'hybrid-reconstruct') {
+    document.querySelector('.cad-docks').classList.add('show-tasks');
+    $('tab-dock-chat')?.click();
+    return;
+  }
   if (cmd === 'analyze-crop') return runAnalyzeCurrentCrop();
   if (cmd === 'ocr-dimensions') return runOcrDimensions();
 });
@@ -1428,6 +1433,28 @@ mountLocalFreecad({
   switchView,
   updateTree,
   getSketch: () => ({ profile: structuredClone(profile), circle: circleProfile ? structuredClone(circleProfile) : null, closed: profileClosed })
+});
+
+export const aiChat = mountAiChat($('ai-chat-container'), {
+  viewer,
+  sketcher,
+  switchView,
+  buildSolid: () => $('build-solid').onclick(),
+  revolveSolid: () => revolveSolid(),
+  getCrops: () => crops,
+  updateTree,
+  setProfile: (newProfile, circle, newHoles, newPockets, depth) => {
+    profile = newProfile;
+    circleProfile = circle;
+    profileClosed = true;
+    holes = newHoles;
+    pockets = newPockets;
+    if (depth) $('model-height').value = depth;
+    sketcher.loadProfile(profile);
+    featureList();
+    invalidate();
+    updateTree();
+  }
 });
 
 // Auto-start blank FreeCAD sketch so user can immediately draw

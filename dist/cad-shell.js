@@ -106,20 +106,24 @@ shell.innerHTML = `
     </div>
   </div>
 
-  <!-- Right Dock: FreeCAD Task Panel (Solver Status + Parameters) -->
+  <!-- Right Dock: FreeCAD Task Panel & AI Chat Assistant -->
   <aside class="tasks-dock">
     <div class="dock-title">
-      <span>Tasks</span>
+      <div class="dock-mode-tabs" style="display:flex;gap:4px;">
+        <button id="tab-dock-chat" class="active" style="padding:3px 8px;font-size:11px;border-radius:4px;background:#20c997;color:#181d24;border:none;font-weight:600;cursor:pointer;">💬 AI Chat</button>
+        <button id="tab-dock-tasks" style="padding:3px 8px;font-size:11px;border-radius:4px;background:#262d38;color:#adb5bd;border:none;cursor:pointer;">📋 Tasks & Solver</button>
+      </div>
       <button id="tasks-close">Close Task</button>
     </div>
-    <div id="task-context">
+    <div id="ai-chat-container"></div>
+    <div id="task-context" hidden>
       <div class="solver-badge" id="solver-badge">
         <span class="solver-dot"></span>
         <strong id="solver-title">Sketcher: Ready</strong>
       </div>
       <p id="solver-desc">Draw closed 2D geometry, then click Pad to create a 3D solid.</p>
     </div>
-    <div id="tasks-content"></div>
+    <div id="tasks-content" hidden></div>
   </aside>
 </div>
 
@@ -194,6 +198,30 @@ $('workbench').onchange = () => {
 };
 
 $('tasks-close').onclick = () => dispatch('close-task');
+
+$('tab-dock-chat').onclick = () => {
+  $('tab-dock-chat').classList.add('active');
+  $('tab-dock-chat').style.background = '#20c997';
+  $('tab-dock-chat').style.color = '#181d24';
+  $('tab-dock-tasks').classList.remove('active');
+  $('tab-dock-tasks').style.background = '#262d38';
+  $('tab-dock-tasks').style.color = '#adb5bd';
+  $('ai-chat-container').hidden = false;
+  $('task-context').hidden = true;
+  $('tasks-content').hidden = true;
+};
+$('tab-dock-tasks').onclick = () => {
+  $('tab-dock-tasks').classList.add('active');
+  $('tab-dock-tasks').style.background = '#20c997';
+  $('tab-dock-tasks').style.color = '#181d24';
+  $('tab-dock-chat').classList.remove('active');
+  $('tab-dock-chat').style.background = '#262d38';
+  $('tab-dock-chat').style.color = '#adb5bd';
+  $('ai-chat-container').hidden = true;
+  $('task-context').hidden = false;
+  $('tasks-content').hidden = false;
+};
+
 $('toggle-properties').onclick = () => {
   const panel = document.querySelector('.property-panel');
   panel.hidden = !panel.hidden;
