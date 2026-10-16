@@ -62,3 +62,9 @@ The FreeCAD dock arrangement is retained, while manual Sketcher/Pad/feature comm
 Default model: gemini-3.8-flash, documented as free-tier eligible on2026-10-15. The free tier requires a key, has project quotas and can use content to improve Google products. Actual charging depends on the user's Google project/tier. The app does not enable billing, silently switch models or promise unlimited free use. Model ID is editable in case availability differs by project. Official docs: https://ai.google.dev/gemini-api/docs/pricing and https://ai.google.dev/gemini-api/docs/rate-limits .
 
 Integration tests use a mocked Google transport, test key/header isolation, quota/truncation failures and strict schema validation, then build/validate a real solid and STEP from the offline proposal. Browser QA covers4 crops with Isometric and an offline one-view proposal (no3-view gate). No live Google inference was tested because no user API key was supplied to the agent.
+# FreeCAD on each visitor's computer
+
+The CAD page now has **FreeCAD trên máy này**. It pairs the tab with an optional loopback-only bridge and exposes the installed Advanced MCP's 165-tool catalog, live object tree, numeric properties, viewport and native FCStd/STEP/STL exports. Each visitor connects their own FreeCAD instance; the public site never shares the owner's desktop session.
+
+Download `dist/downloads/FreeScan-FreeCAD-Bridge.zip`, or see [local-bridge/README.md](local-bridge/README.md). No additional EXE installer or API key is needed; an existing FreeCAD and Node 18+ runtime are required. The original browser CAD and Gemini crop workflow remain available without the bridge. Uploads/exports used by FreeCAD stay in the visitor's local-files folder until they delete them.
+

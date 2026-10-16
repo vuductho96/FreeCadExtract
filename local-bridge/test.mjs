@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {join,resolve,basename,sep} from 'node:path';
 import {startBridge,validate} from './server.mjs';
 
 assert.throws(()=>validate({x:'3'},{type:'object',properties:{x:{type:'number'}}}));
@@ -52,5 +52,5 @@ try{
   console.log('PASS: 165 tools, pairing/CORS/schema/Python guards, native Sketch → Pad → Pocket with volume check, parameter edit, duplicate suppression, scene, FCStd/STEP download and STEP reimport.');
 }finally{
   if(created)await call('freecad_close_document',{name}).catch(()=>{});
-  await bridge.close();await rm(folder,{recursive:true,force:true});
+  await bridge.close();assert.ok(folder.startsWith(resolve(tmpdir())+sep)&&basename(folder).startsWith('freescan-bridge-test-'));await rm(folder,{recursive:true,force:true});
 }

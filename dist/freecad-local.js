@@ -26,8 +26,9 @@ export function mountLocalFreecad({viewer,switchView,getSketch,updateTree}){
     // Gemini panel may be inserted outside the legacy tasks-content.
     document.querySelectorAll('.tasks-dock > :not(.dock-title):not(#fc-panel)').forEach(el=>el.hidden=on);
     if(on){document.querySelector('.cad-docks').classList.add('show-tasks');switchView('model');if(snapshot)renderScene();}
-    else{updateTree();badge.textContent=connected?'FreeCAD connecté · Browser CAD':'Browser CAD';}
-    button.textContent=on?'Retour dessin / Browser CAD':'FreeCAD trên máy này';
+    else{updateTree();badge.textContent=connected?'FreeCAD đã kết nối · Browser CAD':'Browser CAD';}
+    button.textContent=on?'Quay lại bản vẽ':'FreeCAD trên máy này';
+    document.querySelector('.local-state').textContent=on?'FreeCAD trên thiết bị của bạn':'Crops stay local until sent to Gemini';
   }
   function log(message){$('fc-output').textContent=(new Date().toLocaleTimeString()+' '+message+'\n'+$('fc-output').textContent).slice(0,22000);}
   function health(message,error=false){$('fc-health').textContent=message;$('fc-health').classList.toggle('error',error);}

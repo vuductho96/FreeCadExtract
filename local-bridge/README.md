@@ -35,7 +35,7 @@ The local bridge does not need the private OpenAI tunnel created for ChatGPT. Th
 
 ## Upstream
 
-`engine/` and the macro derive from [sergiudanstan/freecad-mcp](https://github.com/sergiudanstan/freecad-mcp), MIT, copyright Dan Stan. The bundled engine matches the locally installed 2.0.0 server's 165-tool definitions and Windows bridge fix. MIT license retained in `engine/LICENSE`. The HTTP layer, pairing and web workspace are FreeScan integration code.
+`engine/` and the macro derive from [sergiudanstan/freecad-mcp](https://github.com/sergiudanstan/freecad-mcp), MIT, copyright Dan Stan. The bundled engine retains the locally installed 2.0.0 server's 165-tool definitions and Windows bridge fix. Integration fixes use Pad.Midplane for FreeCAD 1.1 compatibility and normalize FreeCAD Quantity values before JSON serialization. MIT license retained in `engine/LICENSE`. The HTTP layer, pairing and web workspace are FreeScan integration code.
 
 ## Verification
 
