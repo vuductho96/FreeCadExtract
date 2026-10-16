@@ -2,16 +2,15 @@
 
 Connect the public FreeScan website to FreeCAD on **your own computer**. No OpenAI API key, cloud CAD storage, new EXE installation or public tunnel is required. The existing browser-only CAD / drawing workflow stays available without a connection.
 
-## Start (Windows)
+## Start (Windows) — double click
 
-1. Use an existing FreeCAD installation and Node.js 18+ runtime.
-2. Extract the complete bridge ZIP. Keep `engine/` beside `server.mjs`.
-3. Open FreeCAD → Macro → Macros → select `FreeCAD-Web.FCMacro` → Execute. If the Advanced MCP macro is already listening on 127.0.0.1:12345, reuse it rather than starting another.
-4. Run `Start-FreeCAD-Web.ps1` in PowerShell, or `node server.mjs` in this folder. It does not install software or change PowerShell policy. If scripts are restricted, use the Node command directly.
-5. Open `http://127.0.0.1:8766/pair`. Read the access description and click **Connect FreeScan website**, then **Kết nối** in the website. Allow local-network access if the browser asks. Alternatively paste the local address and pairing key into the website connection dialog.
-6. Click **Tài liệu mới**, choose a tool, enter its parameters and execute. Click **Đồng bộ** after changing a model directly in FreeCAD.
+1. Extract the complete ZIP.
+2. Double-click **Ket-noi-FreeCAD.cmd**. It finds existing Node.js and FreeCAD installations, reuses a running macro or opens FreeCAD with the macro automatically, starts/reuses the loopback bridge and opens the local pairing page. Keep the bridge window open.
+3. Click **Mở website và ghép nối**, then **Kết nối** on the website. Allow local-network access if your browser asks. The site switches to Python mode with FCStd export.
 
-Closing the bridge / FreeCAD ends availability. Restarting the bridge creates a new pairing key. Each browser tab holds the key in memory only; it is not written to localStorage or sent to the Sites host. The web fragment is removed immediately after receipt. Every user runs their own bridge and FreeCAD instance.
+No installer, EXE download, PowerShell policy change, automatic key persistence or public tunnel. Node.js 18+ and FreeCAD must already be installed. For unusual FreeCAD locations set FREECAD_EXE to the existing executable. If macro startup takes over 60 seconds, open FreeCAD-Web.FCMacro manually and retry. Existing FreeCAD documents are not closed. If 8766 is occupied by another app, the launcher stops with an error. Restarting the bridge revokes its previous key.
+
+`node launch.mjs --check` checks availability without starting or pairing. `node launch.mjs --no-browser` starts without opening the browser. `node test-launch.mjs` checks installation discovery and unavailable ports. Advanced manual entry remains available in the site connection dialog.
 
 ## What works
 
