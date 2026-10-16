@@ -76,3 +76,11 @@ The CAD page now has **FreeCAD trên máy này**. It pairs the tab with an optio
 
 Download `dist/downloads/FreeScan-FreeCAD-Bridge.zip`, or see [local-bridge/README.md](local-bridge/README.md). No additional EXE installer or API key is needed; an existing FreeCAD and Node 18+ runtime are required. The original browser CAD and Gemini crop workflow remain available without the bridge. Uploads/exports used by FreeCAD stay in the visitor's local-files folder until they delete them.
 
+
+### Browser CAD Code
+
+Open `cad.html?workspace=code`. Default engine is Replicad 1.1 + OpenCascade WebAssembly, running in a dedicated browser worker. Copy the provided prompt into ChatGPT with individual view crops, paste its JavaScript, review and run. The script receives `cad` and must return one valid Shape3D solid in millimetres. Python FreeCAD remains an optional desktop mode and requires pairing.
+
+Browser mode validates BRep/solid count/volume, displays the mesh and exports real STEP and STL locally. Code and shape live in tab memory, without automatic AI requests or cloud persistence. Source edits disable export until rebuilt. Stop or the 60-second timeout terminates the worker and discards its shape. This is not a security sandbox for untrusted JavaScript. There is no editable FreeCAD feature tree or FCStd export in browser mode; parameters remain editable in the downloaded JavaScript source.
+
+Verification: `node tests/browser-code.mjs` checks exact pocket volume, valid solid, STEP import roundtrip, STL and invalid-code handling using the actual WASM kernel.

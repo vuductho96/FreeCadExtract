@@ -73,14 +73,24 @@ export async function buildSolid(spec) {
   } catch (error) { shape.delete(); throw error; }
 }
 
+export async function executeCode(code) {
+  const oc = await kernel();
+  const shape = await new Function('cad', '"use strict";\n' + code)(cad);
+  if (!shape?.wrapped || typeof shape.mesh !== 'function') throw Error('Code phải return một solid Replicad. Dùng mẫu hoặc copy prompt cho ChatGPT.');
+  try {
+    const metrics = properties(shape, oc);
+    if (!metrics.valid || metrics.solidCount !== 1 || metrics.volume <= 1e-8) throw Error('Kết quả phải là một solid BRep hợp lệ, có thể tích dương.');
+    return {shape, metrics};
+  } catch(e) { shape.delete(); throw e; }
+}
 let queue = Promise.resolve();
 if (typeof self !== 'undefined') self.onmessage = ({data}) => {
   queue = queue.then(async () => {
     const {id,type} = data;
     try {
-      if (type === 'build') {
+      if (type === 'build' || type === 'execute') {
         self.postMessage({id,type:'status',text:'Building and validating local OpenCascade solid…'});
-        const {shape,metrics} = await buildSolid(data.spec);
+        const {shape,metrics} = type === 'execute' ? await executeCode(data.code) : await buildSolid(data.spec);
         const mesh = shape.mesh({tolerance:0.05,angularTolerance:0.2});
         currentShape?.delete(); currentShape = shape;
         self.postMessage({id,type:'built',mesh,metrics,spec:data.spec});

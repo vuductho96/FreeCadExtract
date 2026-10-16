@@ -189,6 +189,7 @@ export function mountLocalFreecad({viewer,switchView,getSketch,updateTree}){
       return result;
     }finally{busy=false;panel.inert=false;}
   }
-  const codeWorkspace=mountCodeWorkspace({runCode,isConnected:()=>connected,connect:()=>dialog.showModal(),showModel:()=>{if(connected){activate(true);if(snapshot)renderScene();}else switchView('model');}});
+  const codeWorkspace=mountCodeWorkspace({runCode,showBrowserModel:(mesh,metrics)=>{activate(false);viewer.show(mesh);switchView('model');},isConnected:()=>connected,connect:()=>dialog.showModal(),showModel:()=>{if(connected){activate(true);if(snapshot)renderScene();}else switchView('model');}});
   return {refresh,runCommands,runCode,openCode:codeWorkspace.open,isConnected:()=>connected,disconnect:()=>$('fc-disconnect').click()};
 }
+
