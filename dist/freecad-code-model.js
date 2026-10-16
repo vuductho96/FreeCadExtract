@@ -42,14 +42,27 @@ print("Valid solid:", round(pocket.Shape.Volume, 6), "mm3")
 print("Sketches fully constrained:", sketch.FullyConstrained, cut.FullyConstrained)
 `;
 
-export const CHATGPT_PROMPT=`Phân tích các crop bản vẽ kỹ thuật tôi gửi và tạo một script Python chạy trong FreeCAD 1.1 qua website FreeScan Drawing.
-1. Trước hết lập bảng kích thước, nguồn crop/cạnh/datum; tách số đọc được, số suy ra và phần còn thiếu. Không âm thầm đoán.
-2. Dùng mm, Sketcher có ràng buộc thật và PartDesign Pad/Pocket/Hole/Fillet/Chamfer phù hợp. Không thay chi tiết bằng khối hộp bao.
-3. Trả về MỘT khối code Python hoàn chỉnh để copy. Không dùng pip, terminal, API key, yêu cầu input() hay hộp thoại tương tác.
-4. Dùng doc = App.ActiveDocument (website tạo tài liệu mới mặc định). Import FreeCAD as App, Part, Sketcher. Không đóng hoặc sửa tài liệu khác; không tự ghi file hoặc truy cập mạng.
-5. Cần file FCStd sửa được: giữ Sketch, ràng buộc và cây feature PartDesign có tên; không gộp toàn bộ thành một Part::Feature tĩnh. Dùng expression hoặc Spreadsheet cho kích thước dùng lại nếu cần. Đặt tham số có tên ở đầu mã. Recompute sau feature; ẩn Sketch/feature cũ và chỉ hiện kết quả cuối.
-6. Kiểm tra Shape.isValid(), số solid và in kết quả bằng print(). Ghi rõ phần chưa xác nhận; không tự khẳng định đúng dung sai.
-7. Mã chạy trên FreeCAD của máy tôi. Website sẽ đồng bộ 3D; FCStd/STEP/STL được xuất bằng nút trên web. Nếu thiếu dữ kiện quan trọng, hỏi tôi trước khi sinh mô hình cuối.`;
+export const CHATGPT_PROMPT=`Từ các crop bản vẽ kỹ thuật tôi gửi kèm, hãy sinh script Python FreeCAD để tôi dán vào website FreeScan Drawing, chạy bằng FreeCAD desktop đã ghép nối và xuất FCStd sửa được từng bước.
+
+QUY TẮC ĐẦU VÀO
+- Đối chiếu các hình chiếu và kích thước, xác định hệ trục / đơn vị / datum. Chỉ dùng kích thước đã xác nhận.
+- Nếu thiếu dữ kiện quyết định hình dạng hoặc kích thước mâu thuẫn, hỏi tôi trước; chưa sinh mô hình cuối và không âm thầm đoán.
+- Nếu đủ dữ kiện, chỉ trả MỘT khối code Python hoàn chỉnh, không giải thích ngoài code. Ghi nguồn kích thước và lưu ý cần thiết bằng comment trong code.
+
+CẤU TRÚC CODE BẮT BUỘC
+1. import FreeCAD as App, FreeCADGui as Gui, Part, Sketcher; from FreeCAD import Vector as V.
+2. D = App.ActiveDocument; báo RuntimeError rõ ràng nếu chưa có tài liệu. Website tạo tài liệu mới trước khi chạy; không tự tạo/đóng tài liệu khác.
+3. Tạo Body mới có tên rõ ràng. Đặt kích thước có tên ở đầu script, đơn vị mm. Không sửa hoặc xóa model có sẵn.
+4. Có hàm tạo Sketch trên XY/YZ/XZ bằng Placement / Rotation đúng hướng. Dùng ràng buộc hình học và kích thước thật: Coincident, Horizontal, Vertical, Distance, Diameter, Angle, Tangent… Kiểm tra FullyConstrained; không khóa toàn bộ bằng Block/Fix, không dùng tọa độ đặt sẵn thay cho ý đồ thiết kế.
+5. Dựng lịch sử feature PartDesign thật: Sketch → Pad / Pocket / Hole → Fillet / Chamfer theo hình học bản vẽ. Không gộp kết quả vào Part::Feature tĩnh, không thay chi tiết bằng khối hộp bao.
+6. Dùng expression cho kích thước và vị trí phụ thuộc nhau khi cần. Giữ Sketch và cây feature trong tài liệu để người dùng sửa qua FreeCAD.
+7. Có hàm check(feature): recompute, kiểm tra Shape không rỗng, isValid() và đúng một solid sau mỗi bước quan trọng. Nếu lỗi, dừng và nêu tên feature; không âm thầm bỏ qua bước.
+8. Khi chọn cạnh bo/vát, tìm theo hướng, tọa độ, chiều dài hoặc quan hệ hình học có dung sai số hợp lý. Xác nhận đúng số cạnh trước khi tạo feature; không đoán tên Edge cố định.
+9. Ẩn Sketch và feature cũ, đặt Body.Tip, hiện feature cuối; không xóa lịch sử. Cuối script hiển thị isometric và fitAll, in số solid, thể tích mm³ và trạng thái ràng buộc Sketch.
+10. Không tự ghi/xuất file, truy cập mạng, cài thư viện, chạy terminal, gọi MCP, dùng input() hoặc mở hộp thoại. Website sẽ thực thi code và xuất FCStd / STEP / STL.
+
+Chỉ dùng Python FreeCAD API; không JavaScript Replicad, CadQuery hoặc build123d. Mục tiêu là mô hình có lịch sử và tham số chỉnh sửa được trong FCStd; STEP chỉ là file trao đổi hình học.
+`;
 
 export function normalizePython(input){
   let code=String(input).replace(/^\uFEFF/,'').trim();
