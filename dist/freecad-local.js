@@ -43,6 +43,7 @@ export function mountLocalFreecad({viewer,switchView,getSketch,updateTree}){
     address=url.origin;key=$('fc-key').value.trim();if(key.length<32)throw Error('Nhập mã từ trang ghép nối cục bộ.');
     info=await post('/connect');if(!info.guiReady)throw Error('Cầu nối đã chạy. Hãy mở FreeCAD và chạy FreeCAD-Web.FCMacro.');
     tools=(await post('/tools')).tools;connected=true;badge.textContent='FreeCAD PC · '+tools.length+' tools';badge.classList.add('connected');
+    document.dispatchEvent(new CustomEvent('freecad-local-status',{detail:{connected:true}}));
     $('fc-key').value='';dialog.close();fillTools();activate(true);await refresh();choose('freecad_create_sketch');
   }
   $('fc-do-connect').onclick=async()=>{try{$('fc-connect-error').textContent='Đang kết nối…';await connect();}catch(e){$('fc-connect-error').textContent=e.message.includes('fetch')?'Không gọi được cầu nối. Kiểm tra cầu nối đang chạy và quyền mạng cục bộ của trình duyệt.':e.message;}};
@@ -137,7 +138,7 @@ export function mountLocalFreecad({viewer,switchView,getSketch,updateTree}){
   });
   $('fc-refresh').onclick=()=>withBusy(refresh);
   $('fc-new').onclick=()=>withBusy(async()=>{await call('freecad_new_document',{name:'FreeScan_'+Date.now()});await refresh();});
-  $('fc-disconnect').onclick=()=>{connected=false;activate(false);key='';snapshot=null;tools=[];badge.textContent='Browser CAD';badge.classList.remove('connected');health('Đã ngắt kết nối');};
+  $('fc-disconnect').onclick=()=>{connected=false;activate(false);key='';snapshot=null;tools=[];badge.textContent='Browser CAD';badge.classList.remove('connected');health('Đã ngắt kết nối');document.dispatchEvent(new CustomEvent('freecad-local-status',{detail:{connected:false}}));};
   $('fc-import').onclick=()=>$('fc-upload').click();$('fc-upload').onchange=()=>withBusy(async()=>{
     const file=$('fc-upload').files[0];if(!file)return;if(file.size>20*1024*1024)throw Error('Giới hạn file nhập 20 MB.');
     const data=await new Promise((ok,no)=>{const reader=new FileReader();reader.onload=()=>ok(reader.result.split(',')[1]);reader.onerror=no;reader.readAsDataURL(file);});
@@ -166,5 +167,13 @@ export function mountLocalFreecad({viewer,switchView,getSketch,updateTree}){
     $('fc-address').value=params.get('freecadBridge')||address;$('fc-key').value=params.get('freecadKey');history.replaceState(null,'',location.pathname+location.search);dialog.showModal();
     $('fc-connect-error').textContent='Mã đã nhận từ cầu nối. Bấm Kết nối để cho phép tab này điều khiển FreeCAD.';
   }
-  return {refresh,disconnect:()=>$('fc-disconnect').click()};
+  async function runCommands(commands){
+    if(!connected)throw Error('Ghép nối bằng nút FreeCAD trên máy này trước.');
+    if(busy)throw Error('Một lệnh FreeCAD đang chạy.');
+    await post('/validate',{commands});busy=true;panel.inert=true;
+    try{activate(true);for(const command of commands)await call(command.tool,command.args||{});await refresh();return{count:commands.length,document:snapshot.document};}
+    catch(e){health(e.message+' · Đồng bộ để kiểm tra các bước đã chạy.',true);throw e;}
+    finally{busy=false;panel.inert=false;}
+  }
+  return {refresh,runCommands,isConnected:()=>connected,disconnect:()=>$('fc-disconnect').click()};
 }

@@ -120,6 +120,10 @@ export async function startBridge(options={}){
     }
     const url=new URL(req.url,`http://${host}`);
     if(req.method==='GET'&&url.pathname==='/pair'){
+      // Pairing secrets are visible only to a top-level local page / same origin.
+      // An allowed CAD site may call authenticated APIs, never read this key.
+      if(origin&&origin!==`http://${host}`){res.writeHead(403);res.end('Open the local pairing page directly.');return;}
+      res.removeHeader('Access-Control-Allow-Origin');
       res.setHeader('Content-Type','text/html; charset=utf-8');
       res.setHeader('Content-Security-Policy',"default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");
       res.setHeader('Referrer-Policy','no-referrer');
@@ -136,6 +140,11 @@ export async function startBridge(options={}){
         result={name:'FreeScan local FreeCAD',tools:tools.length,folder,guiReady:check.success===true,pythonAccess:true};
       }
       else if(url.pathname==='/tools')result={tools};
+      else if(url.pathname==='/validate'){
+        if(!Array.isArray(input.commands)||!input.commands.length||input.commands.length>128)throw Error('Provide 1–128 commands.');
+        for(const cmd of input.commands){const tool=byName.get(cmd.tool);if(!tool||tool.name==='freecad_execute_python')throw Error('Unsupported batch tool');validate(cmd.args||{},tool.inputSchema);}
+        result={valid:true,count:input.commands.length};
+      }
       else if(url.pathname==='/state')result=await queue(()=>python(sceneCode));
       else if(url.pathname==='/call'){
         const tool=byName.get(input.name);if(!tool)throw Error('Unknown MCP tool');

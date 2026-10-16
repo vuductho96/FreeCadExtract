@@ -22,6 +22,7 @@ async function call(tool,args={},id=randomUUID()){
 try{
   assert.equal(bridge.tools.length,165);
   assert.equal((await fetch(root+'/connect',{method:'POST',headers:{Origin:headers.Origin}})).status,401);
+  const crossPair=await fetch(root+'/pair',{headers:{Origin:headers.Origin}});assert.equal(crossPair.status,403);assert.ok(!(await crossPair.text()).includes(bridge.token));
   assert.equal((await fetch(root+'/connect',{method:'POST',headers:{...headers,Origin:'https://untrusted.example'}})).status,403);
   const pre=await fetch(root+'/call',{method:'OPTIONS',headers:{Origin:headers.Origin,'Access-Control-Request-Private-Network':'true'}});
   assert.equal(pre.status,204);assert.equal(pre.headers.get('Access-Control-Allow-Private-Network'),'true');

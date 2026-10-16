@@ -1428,7 +1428,7 @@ export async function applyGeminiProposal(input) {
 }
 */
 
-mountLocalFreecad({
+const localFreecad = mountLocalFreecad({
   viewer,
   switchView,
   updateTree,
@@ -1436,6 +1436,7 @@ mountLocalFreecad({
 });
 
 export const aiChat = mountAiChat($('ai-chat-container'), {
+  freecad: localFreecad,
   viewer,
   sketcher,
   switchView,

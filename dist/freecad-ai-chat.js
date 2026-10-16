@@ -19,7 +19,7 @@ export function mountAiChat(container, hooks) {
       </div>
       <div class="ai-mcp-status" id="chat-mcp-status" title="Trạng thái kết nối FreeCAD MCP trên máy">
         <span class="status-dot">●</span>
-        <span id="chat-mcp-label">FreeCAD MCP: Sẵn sàng</span>
+        <span id="chat-mcp-label">FreeCAD MCP: Chưa ghép nối</span>
       </div>
     </div>
 
@@ -77,19 +77,11 @@ export function mountAiChat(container, hooks) {
   checkMcpBridge();
 
   async function checkMcpBridge() {
-    try {
-      const res = await fetch(bridgeAddress + '/pair', { method: 'GET', signal: AbortSignal.timeout(3000) });
-      if (res.ok) {
-        mcpStatusBadge.classList.remove('disconnected');
-        mcpStatusLabel.textContent = 'FreeCAD MCP: Cổng 8766 OK';
-      } else {
-        throw new Error('Not ready');
-      }
-    } catch {
-      mcpStatusBadge.classList.add('disconnected');
-      mcpStatusLabel.textContent = 'FreeCAD MCP: Chưa kết nối';
-    }
+    const connected=hooks.freecad?.isConnected()===true;
+    mcpStatusBadge.classList.toggle('disconnected',!connected);
+    mcpStatusLabel.textContent=connected?'FreeCAD MCP: Đã ghép nối':'FreeCAD MCP: Chưa ghép nối';
   }
+  document.addEventListener('freecad-local-status',checkMcpBridge);
 
   // Handle Image Upload
   btnUpload.onclick = () => fileInput.click();
@@ -277,7 +269,8 @@ export function mountAiChat(container, hooks) {
       const spec = solution.spec;
 
       // Generate FreeCAD MCP Tool Sequence
-      const mcpCommands = generateFreeCadMcpSequence(solution);
+      let mcpCommands=[],mcpUnavailable='';
+      try{mcpCommands=generateFreeCadMcpSequence(solution);}catch(e){mcpUnavailable=e.message;}
 
       // Build thinking log
       const reasoningItems = [
@@ -341,6 +334,9 @@ export function mountAiChat(container, hooks) {
       thinkingMsg.querySelector('#btn-call-mcp-pc').onclick = async () => {
         await executeFreeCadMcpLive(mcpCommands);
       };
+      thinkingMsg.querySelector('#btn-call-mcp-pc').disabled=!!mcpUnavailable;
+      thinkingMsg.querySelector('#btn-call-mcp-pc').title=mcpUnavailable;
+      if(mcpUnavailable){const note=document.createElement('p');note.textContent=mcpUnavailable;thinkingMsg.querySelector('.ai-actions-row').after(note);}
 
       thinkingMsg.querySelector('#btn-view-sketch-2d').onclick = () => {
         hooks.setProfile(spec.profile, spec.circle || null, spec.holes || [], spec.pockets || [], spec.depth);
@@ -397,16 +393,17 @@ export function mountAiChat(container, hooks) {
 
     cmds.push({
       tool: 'freecad_new_document',
-      args: { documentName: 'AI_Reconstructed_Part' }
+      args: { name: 'AI_Reconstructed_'+Date.now() }
     });
 
     cmds.push({
       tool: 'freecad_create_sketch',
-      args: { sketchName: 'Sketch_BaseProfile', plane: 'XY' }
+      args: { name: 'Sketch_BaseProfile', plane: 'XY' }
     });
 
     // Add lines for profile
-    for (let i = 0; i < s.profile.length; i++) {
+    if(s.circle){cmds.push({tool:'freecad_add_sketch_circle',args:{sketchName:'Sketch_BaseProfile',centerX:s.circle.center[0],centerY:s.circle.center[1],radius:s.circle.radius}});}
+    else for (let i = 0; i < s.profile.length; i++) {
       const p1 = s.profile[i];
       const p2 = s.profile[(i + 1) % s.profile.length];
       cmds.push({
@@ -423,9 +420,9 @@ export function mountAiChat(container, hooks) {
       cmds.push({
         tool: 'freecad_revolve',
         args: {
-          profileName: 'Sketch_BaseProfile',
+          sketchName: 'Sketch_BaseProfile',
           angle: 360,
-          axis: 'Y_Axis'
+          axisX: 0, axisY: 1, axisZ: 0
         }
       });
     } else {
@@ -438,16 +435,15 @@ export function mountAiChat(container, hooks) {
       });
     }
 
-    for (const h of s.holes || []) {
-      cmds.push({
-        tool: 'freecad_hole',
-        args: {
-          diameter: h.radius * 2,
-          depth: s.depth + 10,
-          holeType: 'Through'
-        }
-      });
+    for (const [i,h] of (s.holes || []).entries()) {
+      if(h.axis&&h.axis!=='Z')throw Error('AI transfer hiện chỉ hỗ trợ lỗ trục Z; dùng form Hole/Pocket để dựng lỗ trục khác.');
+      const name='HoleSketch_'+i;
+      cmds.push({tool:'freecad_create_sketch',args:{name,plane:'XY'}});
+      cmds.push({tool:'freecad_add_sketch_circle',args:{sketchName:name,centerX:h.x,centerY:h.y,radius:h.radius}});
+      cmds.push({tool:'freecad_move_object',args:{objectName:name,x:0,y:0,z:s.depth}});
+      cmds.push({tool:'freecad_pocket',args:{sketchName:name,depth:s.depth,name:'ThroughHole_'+i}});
     }
+    if(s.pockets?.length||s.fillet||s.chamfer)throw Error('Có Pocket/bo/vát cần xác nhận vị trí và cạnh bằng form FreeCAD trước khi chuyển AI tự động.');
 
     return cmds;
   }
@@ -455,26 +451,16 @@ export function mountAiChat(container, hooks) {
   async function executeFreeCadMcpLive(commands) {
     const notify = appendMessage('assistant', `Đang gửi ${commands.length} lệnh tới FreeCAD MCP trên máy…`);
     try {
-      // Test bridge connection
-      const conn = await fetch(bridgeAddress + '/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      });
-
-      if (!conn.ok) {
-        throw new Error('Cầu nối FreeCAD 8766 yêu cầu ghép nối trước. Vui lòng mở nút "FreeCAD trên máy này" để hoàn tất ghép nối.');
-      }
+      const result=await hooks.freecad.runCommands(commands);
 
       notify.querySelector('.ai-msg-bubble').innerHTML = `
         ✓ Đã kết nối FreeCAD Desktop!<br>
-        Đang thực hiện chuỗi lệnh dựng hình trong FreeCAD...
+        Đã thực hiện ${result.count} lệnh trong tài liệu ${result.document}. Mô hình được đồng bộ từ FreeCAD thật.
       `;
     } catch (e) {
-      notify.querySelector('.ai-msg-bubble').innerHTML = `
-        <span style="color:#fcc419;">Thông báo kết nối FreeCAD MCP:</span> ${e.message}<br><br>
-        <small class="muted">Trong lúc chưa bật cầu nối FreeCAD Desktop, mô hình đã được dựng và hiển thị đầy đủ trên Web 3D Viewport qua OpenCascade WASM.</small>
-      `;
+      const error=document.createElement('p');error.textContent='FreeCAD MCP: '+e.message;
+      const note=document.createElement('small');note.textContent='Nếu một số lệnh đã chạy, dùng Đồng bộ để kiểm tra FreeCAD trước khi chạy lại.';
+      notify.querySelector('.ai-msg-bubble').replaceChildren(error,note);
     }
   }
 
