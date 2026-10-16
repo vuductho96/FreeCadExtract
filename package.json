@@ -1,0 +1,26 @@
+{
+  "name": "freescan-drawing-standalone",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node serve.mjs",
+    "prepare:cad": "node build-cad-vendor.mjs",
+    "test": "node tests/dimension-parser.mjs && node tests/cad-kernel.mjs && node tests/gemini-cad.mjs && node tests/freecad-sketcher.mjs && node tests/hybrid-cad-solver.mjs && node tests/freecad-code.mjs && node tests/browser-code.mjs && node local-bridge/test-suite.mjs && node local-bridge/test-launch.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Local OCR and CAD workspace; independent of Sites and ChatGPT subscriptions",
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@tabler/icons": "3.35.0",
+    "esbuild": "^0.25.10",
+    "onnxruntime-web": "^1.22.0",
+    "pdfjs-dist": "^4.10.38",
+    "replicad": "^1.1.0",
+    "replicad-opencascadejs": "^1.1.0",
+    "three": "^0.180.0"
+  },
+  "type": "module"
+}

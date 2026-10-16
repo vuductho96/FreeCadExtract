@@ -1,0 +1,2 @@
+import {startSuite} from './multi-server.mjs';import {spawn} from 'node:child_process';
+try{await startSuite();console.log('FreeScan CAD Suite: http://127.0.0.1:8877/pair — keep this window open.');const p=spawn('cmd.exe',['/d','/c','start','','http://127.0.0.1:8877/pair'],{windowsHide:true,stdio:'ignore'});p.on('error',e=>console.error(e.message));}catch(e){console.error(e.code==='EADDRINUSE'?'Cổng 8877 đang dùng. Nếu đã chạy CAD Suite, mở http://127.0.0.1:8877/pair; không tự dừng ứng dụng khác.':e.message);process.exitCode=1;}

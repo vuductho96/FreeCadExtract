@@ -1,0 +1,7 @@
+{
+  "edition": "standalone",
+  "version": "1.0.0",
+  "upstream_commit": "613899a16fe2619d5cec028f08eab0386769f269",
+  "web": "http://127.0.0.1:5174",
+  "requires_chatgpt_plus": false
+}

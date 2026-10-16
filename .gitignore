@@ -1,0 +1,17 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.key
+*.log
+*.zip
+!dist/downloads/*.zip
+*.tar.gz
+*.FCStd
+*.FCStd1
+*.step
+*.stp
+*.stl
+.openai/
+local-files/
+cad-suite/

@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {executeCode} from '../dist/cad-worker.js';
+import {SAMPLE_JS,normalizeJS} from '../dist/browser-code.js';
+import * as cad from '../dist/vendor/cad/replicad.js';
+const {shape,metrics}=await executeCode(normalizeJS(SAMPLE_JS));
+assert.equal(metrics.valid,true);assert.equal(metrics.solidCount,1);
+assert.ok(Math.abs(metrics.volume-(8000-36*Math.PI))<1e-5);
+const step=shape.blobSTEP();assert.match(await step.text(),/ISO-10303-21/);
+const imported=await cad.importSTEP(step),v=cad.measureShapeVolumeProperties(imported);
+assert.ok(Math.abs(v.volume-metrics.volume)<1e-5);v.delete();imported.delete();
+assert.ok(shape.mesh().triangles.length>0);assert.ok(shape.blobSTL({binary:true}).size>100);
+await assert.rejects(executeCode('const a=2;'),/return/);
+await assert.rejects(executeCode('return ???;'),SyntaxError);
+assert.throws(()=>normalizeJS('import FreeCAD as App'),/Python/);
+assert.equal(normalizeJS('```js\nreturn part;\n```'),'return part;\n');shape.delete();
+console.log('Browser code: real solid, exact pocket volume, STEP roundtrip, STL, errors passed.');
