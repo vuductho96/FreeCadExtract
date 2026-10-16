@@ -1,6 +1,6 @@
-import {mountGeminiPanel} from './gemini-panel.js';
+// import {mountGeminiPanel} from './gemini-panel.js';
 import {mountLocalFreecad} from './freecad-local.js';
-import {validateProposal} from './gemini-cad.js';
+// import {validateProposal} from './gemini-cad.js';
 import {FreeCadSketcher} from './freecad-sketcher.js';
 import './cad-shell.js';
 import * as pdfjs from './vendor/pdf.mjs';
@@ -1205,7 +1205,9 @@ function featureDialog(kind) {
   dialog.showModal();
 }
 
-// Append Gemini AI and FreeCAD Local Bridge to Toolbar without removing CAD tools
+// Gemini AI crop-to-3D API temporarily disabled per user request
+// (To re-enable: uncomment mountGeminiPanel, validateProposal, and button below)
+/*
 const extGroup = document.createElement('div');
 extGroup.className = 'tool-group';
 const btnGemini = document.createElement('button');
@@ -1262,6 +1264,7 @@ export async function applyGeminiProposal(input) {
   status('Gemini proposal built. Review inferred features and dimensions before export.');
   return { built: true };
 }
+*/
 
 mountLocalFreecad({
   viewer,
