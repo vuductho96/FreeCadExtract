@@ -1,62 +1,974 @@
-/* Desktop CAD composition, based on the supplied FreeCAD Sketcher reference. */
-:root{--cad-bg:#f1f1f1;--cad-border:#c7c7c7;--cad-text:#202020;--cad-accent:#346b9d}body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:var(--cad-text);background:#efefef;overflow:hidden}header[hidden],main[hidden],.steps[hidden]{display:none!important}button,.button,select,input{font-family:inherit;color:#202020;border-radius:2px;font-size:12px}button,.button{padding:5px 8px;border-color:#c8c8c8;background:#f6f6f6}button:hover{background:#e4edf6;border-color:#89a6bd}button:disabled{opacity:.35}#cad-shell{height:calc(100dvh - 28px);display:flex;flex-direction:column}.cad-menubar{height:29px;display:flex;align-items:center;gap:0;padding:0 8px;background:#fafafa;border-bottom:1px solid #d8d8d8}.cad-menubar strong{font-size:12px;font-weight:600;margin-right:15px}.cad-menubar button{border:0;background:none;padding:4px 10px}.document-title{margin-left:25px;color:#646464;font-size:11px}.local-state{margin-left:auto;color:#71806f;font-size:10px}.cad-toolbar{display:flex;align-items:center;gap:0;min-height:75px;padding:5px 8px;flex-wrap:wrap;background:#eee;border-bottom:1px solid #c6c6c6}.tool-group{display:flex;align-items:center;gap:2px;border-right:1px solid #c6c6c6;margin-right:8px;padding-right:8px}.tool-group>button{background:transparent;border:1px solid transparent;padding:4px;min-height:29px}.tool-group>button:hover{background:#dae7f2;border-color:#a6b8c9}.tool-group img{width:22px;height:22px;object-fit:contain;display:block}.tool-group.command-strip button{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:43px;padding:4px 5px}.tool-group.command-strip button span{font-size:10px}.tool-group.command-strip:nth-last-child(2) img{filter:invert(17%) sepia(70%) saturate(2300%) hue-rotate(345deg)}.tool-group.command-strip:last-child img{filter:invert(39%) sepia(60%) saturate(700%) hue-rotate(105deg)}#file-tools button,.compact-file{font-size:10px;white-space:nowrap;padding:5px}.workbench-label{display:flex;align-items:center;gap:6px;font-size:10px;color:#646464;margin-right:10px}.workbench-label select{width:120px;height:29px;padding:3px;background:#f9f9f9;border:1px solid #bdbdbd}.cad-docks{flex:1;min-height:0;display:grid;grid-template-columns:220px minmax(250px,1fr) 290px;gap:3px;padding:3px;background:#ddd}.model-dock,.tasks-dock{overflow:auto;background:#eee;min-width:0}.dock-title{height:28px;display:flex;align-items:center;justify-content:space-between;padding:4px 8px;font-size:12px;font-weight:400;background:#ececec;border-bottom:1px solid #c9c9c9}.dock-title button{font-size:10px;padding:1px 5px;background:transparent;border:0;color:#666}#model-tree{min-height:160px;padding:8px 4px;font-size:12px}.tree-node{display:flex;align-items:center;gap:5px;padding:4px 5px;cursor:pointer;min-height:25px;color:#252525}.tree-node:hover{background:#dae8f5}.tree-node.active{background:#a2d961}.tree-node.child{padding-left:22px}.tree-node.feature{padding-left:38px}.tree-node img{width:16px;height:16px;opacity:.8}.tree-node small{margin-left:auto;font-size:9px;color:#6e6e6e}.property-panel{border-top:1px solid #c5c5c5;margin-top:25px;min-height:190px}#property-grid{display:grid;grid-template-columns:95px 1fr;font-size:11px;padding:0 5px;gap:0;margin:0}#property-grid dt,#property-grid dd{border-bottom:1px solid #d7d7d7;margin:0;padding:6px 4px;overflow:hidden;text-overflow:ellipsis}.model-dock details{margin:5px 0;border-top:1px solid #c7c7c7}.model-dock summary{font-size:11px;padding:9px 5px;cursor:pointer;background:#e6e6e6}#reference-tools{padding:5px}#reference-tools>#drawing-name{font-size:10px;display:block;margin-bottom:5px;word-break:break-all}#reference-tools .inspector{height:auto;background:#f4f4f4;overflow:visible}#reference-tools .align-fields{padding:7px 2px;gap:5px}#reference-tools .align-fields label{font-size:10px;color:#555}#reference-tools .map-controls{padding:5px 0}#reference-tools .map-controls label{font-size:10px}#reference-tools .map-controls select{max-width:105px;font-size:10px}#reference-tools .pane-title{padding:5px 0;min-height:28px;font-size:10px}#reference-tools .crop-list{padding:3px 0;max-height:200px}#reference-tools .report{font-size:10px;margin:4px 0;padding:5px;background:#e7e7e7;color:#555}#reference-tools>.button,#reference-tools>button{font-size:10px;margin:4px 0}#reference-tools #analyze,#reference-tools #ocr-dimensions{width:100%}#reference-tools .inset{padding:0 2px}.cad-stage{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;background:#f7f7f7}.stage-tabs{height:29px;display:flex;align-items:center;gap:1px;border-bottom:1px solid #d1d1d1;background:#eaeaea}.stage-tabs button{border:0;border-radius:0;padding:6px 15px;background:transparent;font-size:11px}.stage-tabs button.active{background:#fafafa;color:#164e80;border-bottom:2px solid #5c8bb2}.stage-tabs #edit-state{margin-left:auto;margin-right:12px;color:#777;font-size:10px}.stage-content{position:relative;flex:1;min-height:0;overflow:hidden}.stage-content .drawing-pane{height:100%;background:#f7f7f7}.source-pagebar{position:absolute;top:0;left:0;z-index:3;border:0;background:transparent;min-height:25px;padding:4px 8px;font-size:10px}.source-pagebar button,.source-pagebar select{font-size:10px;padding:2px 4px}.source-pagebar #source-zoom{font-size:10px;color:#666}.reference-canvas-tools{position:absolute;left:5px;bottom:28px;z-index:3;max-width:calc(100% - 160px);padding:2px;gap:2px}.reference-canvas-tools button{font-size:9px;padding:3px 5px;background:#f7f7f7e8}.stage-content #source-viewport{background:#fafafa}.stage-content #source-canvas{background:#fafafa}.source-footer{height:25px;border-top:1px solid #ddd;background:#eee;font-size:9px}.stage-content #model-viewport{position:absolute;inset:0;height:100%;background:#fafafa;display:none}.cad-stage[data-mode=model] .drawing-pane{visibility:hidden}.cad-stage[data-mode=model] #model-viewport{display:block}.stage-content #cube-wrap{position:absolute;top:8px;right:8px;width:150px;height:156px;z-index:4;background:transparent;pointer-events:none}.stage-content #view-cube{width:150px;height:120px;pointer-events:auto}.stage-content .cube-caption{bottom:4px;font-size:9px}.stage-content .cube-caption strong{font-size:9px;margin-bottom:3px;color:#4c4c4c}.stage-content .cube-caption small{font-size:8px;color:#888}.stage-content #view-shortcuts{position:absolute;right:8px;top:165px;width:146px;padding:0;z-index:4;gap:2px}.stage-content #view-shortcuts button{font-size:8px;padding:3px 2px;background:#f0f0f0c9}.stage-content #view-shortcuts .mapped{background:#d7e6da;color:#285d3c;border-color:#adc0ae}.document-tabs{height:27px;background:#e6e6e6;display:flex;align-items:center;gap:10px;font-size:11px;border-top:1px solid #ccc}.document-tabs>span.active{height:100%;padding:5px 15px;background:white;border:1px solid #c3c3c3;border-bottom:0}.document-tabs #sketch-hint{font-size:10px;color:#777;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.tasks-dock{padding-bottom:10px}#tasks-close{font-size:11px!important;padding:3px 12px!important;background:#fafafa!important;border:1px solid #bdbdbd!important}#task-context{padding:8px;margin:8px;background:#f7f7f7;border:1px solid #ccc}#task-context strong{font-size:11px;color:#333}#task-context p{font-size:11px;color:#666;line-height:1.5;margin:8px 0 0}.tasks-dock .model-settings{padding:8px}.tasks-dock .section-heading{border:1px solid #c7c7c7;background:#e5e5e5;padding:6px}.tasks-dock .section-heading strong{font-size:11px}.tasks-dock .model-settings>.muted{display:none}.tasks-dock .feature-actions{margin:6px 0;gap:3px}.tasks-dock .feature-actions button{font-size:10px;padding:4px}.tasks-dock #analyze,.tasks-dock #ocr-dimensions{display:none}.tasks-dock .align-fields{gap:6px}.tasks-dock .align-fields label{color:#555}.tasks-dock .report{border:1px solid #d5d5d5;background:#f6f6f6;border-radius:0;font-size:10px;color:#666}.tasks-dock .primary{border:1px solid #b8c2cb;border-radius:2px;background:#e5edf4;color:#19486c;padding:8px;font-size:11px}.tasks-dock .primary:hover{background:#cddfec}.tasks-dock .confirm{font-size:10px;color:#555;margin:9px 0}.tasks-dock .export-actions{display:grid;grid-template-columns:1fr 1fr;gap:4px}.tasks-dock .export-actions button{font-size:10px;padding:5px}.tasks-dock .feature-row{border:1px solid #d4d4d4;background:#f5f5f5;padding:5px}.tasks-dock #analysis{max-height:90px;overflow:auto}.tasks-dock #analysis button{font-size:9px;padding:3px}.tasks-dock #features{max-height:160px;overflow:auto}#source-empty{background:#fafafa}#source-empty h2{font-size:20px;font-weight:400;letter-spacing:0}#source-empty p{font-size:11px;color:#777}#source-empty .muted{font-size:10px}#cad-menu{position:fixed;z-index:20;min-width:160px;padding:4px;background:#fafafa;border:1px solid #aaa;box-shadow:2px 3px 7px #0002}#cad-menu button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:6px 12px}#cad-menu button:hover{background:#dce8f5}footer{height:28px;background:#ececec;border-color:#c5c5c5;font-size:10px;color:#444}.axis-caption{font-size:9px;color:#777}.pill{display:none}@media(max-width:1050px){.cad-docks{grid-template-columns:185px minmax(250px,1fr) 255px}.cad-toolbar{min-height:90px}.tool-group.command-strip button{min-width:36px}.tool-group.command-strip button span{font-size:9px}.workbench-label{font-size:0}.workbench-label select{font-size:11px;width:100px}.document-title{display:none}}@media(max-width:750px){.cad-docks{grid-template-columns:150px minmax(200px,1fr)}.tasks-dock{position:absolute;right:3px;top:145px;bottom:31px;width:250px;z-index:6;display:none;border:1px solid #bbb}.cad-docks.show-tasks .tasks-dock{display:block}.cad-toolbar{max-height:112px;overflow:auto}.tool-group.command-strip button{min-width:34px}.cad-menubar strong{font-size:11px;margin-right:4px}.cad-menubar button{padding:4px 6px;font-size:11px}.local-state{display:none}.stage-content #cube-wrap{width:120px;right:3px}.stage-content #view-cube{width:120px}.stage-content #view-shortcuts{width:116px;right:3px}.reference-canvas-tools{max-width:100%}.reference-canvas-tools button{font-size:8px}.document-tabs #sketch-hint{display:none}}@media(max-width:450px){.cad-docks{grid-template-columns:100px minmax(200px,1fr)}.model-dock .dock-title{font-size:10px;padding:4px}.tree-node{font-size:10px;padding:3px}.tree-node.child{padding-left:10px}.tree-node.feature{padding-left:17px}.tree-node img{width:12px;height:12px}#property-grid{grid-template-columns:45px 1fr;font-size:9px}.model-dock summary{font-size:9px}.stage-content #cube-wrap{width:95px;height:130px}.stage-content #view-cube{width:95px;height:100px}.stage-content #view-shortcuts{top:137px;width:92px}.stage-content .cube-caption small{display:none}.stage-tabs button{padding:6px 8px;font-size:10px}.stage-tabs #edit-state{display:none}}
+/* ==========================================================================
+   FreeCAD Web - Modern Professional CAD Studio Theme
+   Inspired by top-tier CAD interfaces: Onshape, Plasticity, CascadeStudio, Replicad Studio
+   ========================================================================== */
 
-.viewport-actions{position:absolute;right:8px;bottom:32px;display:flex;gap:6px;align-items:center;z-index:4;font-size:10px}.viewport-actions button{font-size:10px;padding:3px 6px}.cad-stage[data-mode=sketch] .viewport-actions{display:none}.tasks-dock .align-fields{grid-template-columns:1fr 1fr}.tasks-dock input,.tasks-dock select{width:100%;max-width:100%}.tasks-dock input[type=checkbox]{width:auto}.tasks-dock .align-fields label{min-width:0}
+:root {
+  --cad-bg: #0f1218;
+  --cad-surface: #161a24;
+  --cad-surface-elevated: #1e2433;
+  --cad-surface-hover: #262e40;
+  --cad-border: #273144;
+  --cad-border-light: #37445e;
+  --cad-text: #f1f5f9;
+  --cad-text-muted: #94a3b8;
+  --cad-text-dim: #64748b;
+  --cad-accent: #0284c7;
+  --cad-accent-hover: #38bdf8;
+  --cad-accent-glow: rgba(56, 189, 248, 0.25);
+  --cad-success: #10b981;
+  --cad-success-hover: #34d399;
+  --cad-warning: #f59e0b;
+  --cad-danger: #ef4444;
+}
 
-.sketch-dimensions{margin:8px;border:1px solid #c7c7c7;padding-bottom:6px}.sketch-dimensions label{font-size:10px;display:grid;grid-template-columns:1fr 90px;align-items:center;gap:4px;margin:6px}.sketch-dimensions input{padding:4px;min-width:0}.sketch-dimensions button{margin:0 6px;font-size:10px}.tasks-dock .sketch-dimensions input{width:100%}.tasks-dock .model-settings{overflow:hidden}.model-dock #from-ocr{font-size:10px}
+* { box-sizing: border-box; }
 
-.feature-dialog{border:1px solid #aaa;border-radius:3px;padding:18px;min-width:280px;color:#222;background:#f4f4f4}.feature-dialog::backdrop{background:#0004}.feature-dialog h3{font-size:14px;margin:0 0 15px}.feature-dialog label{display:grid;grid-template-columns:1fr 100px;gap:12px;align-items:center;margin:8px 0;font-size:12px}.feature-dialog input,.feature-dialog select{width:100%;padding:5px}.feature-dialog form>div{display:flex;gap:6px;justify-content:flex-end;margin-top:14px}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  color: var(--cad-text);
+  background: var(--cad-bg);
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
 
-.tasks-dock>.dock-title{position:sticky;top:0;z-index:5}.tasks-dock #tasks-content{min-width:0}
+header[hidden], main[hidden], .steps[hidden] { display: none !important; }
 
-/* FreeCAD Web Clone Styling */
-.brand-title{display:flex;align-items:center;gap:6px;margin-right:15px;font-size:13px;color:#183247}
-.fc-logo-icon{font-size:16px}
-.command-strip button.active,.command-strip button:active{background:#d2e6fa!important;border-color:#339af0!important;box-shadow:inset 0 1px 2px rgba(0,0,0,0.12)}
-#btn-construction.active{background:#e7f5ff!important;border-color:#339af0!important;color:#1c7ed6}
-#btn-grid-snap.active{background:#ebfbee!important;border-color:#20c997!important}
-.btn-finish-sketch{background:#ebfbee!important;border-color:#40c057!important;color:#2b8a3e}
-.btn-finish-sketch:hover{background:#d3f9d8!important}
-.sketch-strip.hidden-strip{display:none!important}
-.part-strip.hidden-strip{display:none!important}
+/* Base Form & Button Controls */
+button, .button, select, input {
+  font-family: inherit;
+  color: var(--cad-text);
+  border-radius: 4px;
+  font-size: 12px;
+}
 
-.solver-badge{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#e6fcf5;border:1px solid #96f2d7;border-radius:3px;margin-bottom:6px}
-.solver-badge.under-constrained{background:#fff9db;border-color:#ffe066}
-.solver-badge.invalid{background:#fff5f5;border-color:#ffc9c9}
-.solver-dot{width:10px;height:10px;border-radius:50%;background:#20c997;display:inline-block;box-shadow:0 0 5px #20c997}
-.solver-badge.under-constrained .solver-dot{background:#fcc419;box-shadow:0 0 5px #fcc419}
-.solver-badge.invalid .solver-dot{background:#ff6b6b;box-shadow:0 0 5px #ff6b6b}
-#solver-title{font-size:11px;color:#0ca678}
-.solver-badge.under-constrained #solver-title{color:#e67700}
-.solver-badge.invalid #solver-title{color:#c92a2a}
+button, .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--cad-border);
+  background: var(--cad-surface-elevated);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
 
-.fc-modal-help{border:1px solid #999;border-radius:6px;padding:20px;max-width:500px;background:#fff;color:#222;font:13px/1.6 system-ui}
-.fc-modal-help::backdrop{background:rgba(0,0,0,0.4)}
-.fc-modal-help h3{margin-top:0;font-size:16px;color:#183247}
-.fc-modal-help table{width:100%;border-collapse:collapse;margin:12px 0}
-.fc-modal-help th,.fc-modal-help td{padding:6px 8px;border-bottom:1px solid #eee;text-align:left;font-size:12px}
-.fc-modal-help kbd{background:#f1f3f5;border:1px solid #ced4da;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:11px}
+button:hover, .button:hover {
+  background: var(--cad-surface-hover);
+  border-color: var(--cad-border-light);
+  color: #fff;
+}
+
+button:disabled, .button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+input[type=number], input[type=text], select {
+  background: #11151e;
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  padding: 5px 8px;
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+input[type=number]:focus, input[type=text]:focus, select:focus {
+  border-color: var(--cad-accent-hover);
+  box-shadow: 0 0 0 2px var(--cad-accent-glow);
+}
+
+/* Application Shell Layout */
+#cad-shell {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--cad-bg);
+}
+
+/* 1. Menubar */
+.cad-menubar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 12px;
+  background: #141720;
+  border-bottom: 1px solid var(--cad-border);
+}
+
+.brand-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: 18px;
+  font-size: 13px;
+  color: #fff;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+}
+
+.fc-logo-icon {
+  font-size: 16px;
+  color: var(--cad-accent-hover);
+}
+
+.brand-badge {
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(2, 132, 199, 0.2);
+  color: var(--cad-accent-hover);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 1px 7px;
+  border-radius: 12px;
+  letter-spacing: 0.2px;
+}
+
+.cad-menubar button {
+  border: 0;
+  background: transparent;
+  color: var(--cad-text-muted);
+  padding: 5px 9px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+
+.cad-menubar button:hover {
+  background: var(--cad-surface-hover);
+  color: #fff;
+}
+
+.document-title {
+  margin-left: 18px;
+  color: var(--cad-text-dim);
+  font-size: 11px;
+}
+
+.menubar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-back-ocr {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--cad-accent-hover);
+  text-decoration: none;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(2, 132, 199, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  transition: all 0.15s ease;
+}
+
+.nav-back-ocr:hover {
+  background: rgba(2, 132, 199, 0.25);
+  border-color: var(--cad-accent-hover);
+}
+
+.local-state {
+  color: var(--cad-success);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 2. Ribbon Toolbar */
+.cad-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 52px;
+  padding: 6px 12px;
+  background: var(--cad-surface);
+  border-bottom: 1px solid var(--cad-border);
+  flex-wrap: wrap;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border-right: 1px solid var(--cad-border);
+  margin-right: 8px;
+  padding-right: 8px;
+}
+
+.tool-group > button {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 5px;
+  min-height: 32px;
+  border-radius: 4px;
+}
+
+.tool-group > button:hover {
+  background: var(--cad-surface-hover);
+  border-color: var(--cad-border-light);
+}
+
+.tool-group img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+  filter: brightness(0) invert(0.85);
+  transition: transform 0.1s ease;
+}
+
+.tool-group > button:hover img {
+  filter: brightness(0) invert(1);
+}
+
+.tool-group.command-strip button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 44px;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.tool-group.command-strip button span {
+  font-size: 10px;
+  color: var(--cad-text-muted);
+}
+
+.tool-group.command-strip button:hover span {
+  color: #fff;
+}
+
+.command-strip button.active, .command-strip button:active {
+  background: var(--cad-accent) !important;
+  border-color: var(--cad-accent-hover) !important;
+  box-shadow: 0 0 10px var(--cad-accent-glow);
+}
+
+.command-strip button.active span, .command-strip button:active span {
+  color: #fff !important;
+}
+
+#btn-construction.active {
+  background: #1e3a8a !important;
+  border-color: #60a5fa !important;
+}
+
+#btn-grid-snap.active {
+  background: #064e3b !important;
+  border-color: var(--cad-success) !important;
+}
+
+.btn-finish-sketch {
+  background: #064e3b !important;
+  border-color: #059669 !important;
+  color: #a7f3d0 !important;
+}
+
+.btn-finish-sketch:hover {
+  background: #047857 !important;
+  color: #fff !important;
+}
+
+.workbench-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--cad-text-muted);
+  margin-right: 10px;
+}
+
+.workbench-label select {
+  width: 130px;
+  height: 30px;
+  padding: 4px 8px;
+  background: #11151e;
+  border: 1px solid var(--cad-border);
+  color: #fff;
+  border-radius: 4px;
+}
+
+#file-tools button, .compact-file {
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 5px 8px;
+}
+
+/* 3. Dock Workspace Grid */
+.cad-docks {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 240px minmax(320px, 1fr) 300px;
+  gap: 3px;
+  padding: 3px;
+  background: var(--cad-bg);
+}
+
+.model-dock, .tasks-dock {
+  overflow: auto;
+  background: var(--cad-surface);
+  border: 1px solid var(--cad-border);
+  border-radius: 6px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dock-title {
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #131722;
+  border-bottom: 1px solid var(--cad-border);
+  color: var(--cad-text-muted);
+}
+
+.dock-mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dock-tab-btn {
+  border: 0;
+  background: transparent;
+  color: var(--cad-text-muted);
+  padding: 4px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dock-tab-btn:hover {
+  background: var(--cad-surface-hover);
+  color: #fff;
+}
+
+.dock-tab-btn.active {
+  background: var(--cad-surface-elevated);
+  color: var(--cad-accent-hover);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--cad-accent-hover);
+}
+
+/* Left Dock: Tree & Property */
+#model-tree {
+  min-height: 160px;
+  padding: 6px 4px;
+  font-size: 12px;
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  min-height: 26px;
+  color: var(--cad-text);
+  border-radius: 4px;
+  transition: background 0.1s ease;
+}
+
+.tree-node:hover {
+  background: var(--cad-surface-hover);
+}
+
+.tree-node.active {
+  background: rgba(2, 132, 199, 0.25);
+  color: #fff;
+  border-left: 2px solid var(--cad-accent-hover);
+}
+
+.tree-node.child { padding-left: 24px; }
+.tree-node.feature { padding-left: 38px; }
+.tree-node img { width: 16px; height: 16px; opacity: 0.85; filter: brightness(0) invert(0.9); }
+.tree-node small { margin-left: auto; font-size: 9px; color: var(--cad-text-dim); }
+
+.property-panel {
+  border-top: 1px solid var(--cad-border);
+  margin-top: 10px;
+  min-height: 180px;
+}
+
+#property-grid {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  font-size: 11px;
+  padding: 0;
+  margin: 0;
+}
+
+#property-grid dt, #property-grid dd {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  margin: 0;
+  padding: 6px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#property-grid dt {
+  color: var(--cad-text-muted);
+  background: rgba(0, 0, 0, 0.15);
+}
+
+#property-grid dd {
+  color: var(--cad-text);
+}
+
+/* Left Dock: 2D Projection Views */
+#left-dock-ref-wrap {
+  padding: 10px;
+  overflow: auto;
+}
+
+#reference-tools .crop-card {
+  background: #11151e;
+  border: 1px solid var(--cad-border);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#reference-tools .crop-card.selected {
+  border-color: var(--cad-accent-hover);
+  background: rgba(2, 132, 199, 0.15);
+}
+
+#reference-tools .align-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+#reference-tools .align-fields label {
+  font-size: 10px;
+  color: var(--cad-text-muted);
+}
+
+#reference-tools .map-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+/* 4. Center Stage (2D, 3D, Split View) */
+.cad-stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #0c0e14;
+  border: 1px solid var(--cad-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.stage-tabs {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  background: #131722;
+  border-bottom: 1px solid var(--cad-border);
+}
+
+.stage-view-modes {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.stage-view-modes button {
+  border: 0;
+  border-radius: 4px;
+  padding: 5px 12px;
+  background: transparent;
+  font-size: 11px;
+  color: var(--cad-text-muted);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.stage-view-modes button:hover {
+  background: var(--cad-surface-hover);
+  color: #fff;
+}
+
+.stage-view-modes button.active {
+  background: var(--cad-surface-elevated);
+  color: var(--cad-accent-hover);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--cad-accent-hover);
+}
+
+.stage-hud-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(17, 21, 30, 0.7);
+  padding: 2px 4px;
+  border-radius: 5px;
+  border: 1px solid var(--cad-border);
+}
+
+.stage-hud-tools button {
+  padding: 3px 7px;
+  font-size: 10px;
+  background: transparent;
+  border: 0;
+  color: var(--cad-text-muted);
+  border-radius: 3px;
+}
+
+.stage-hud-tools button:hover {
+  background: var(--cad-surface-hover);
+  color: #fff;
+}
+
+#edit-state {
+  color: var(--cad-text-dim);
+  font-size: 10px;
+  margin-right: 6px;
+}
+
+.stage-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Normal 2D Stage Mode */
+.stage-content .drawing-pane {
+  height: 100%;
+  background: #12151d;
+}
+
+.source-pagebar {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  background: rgba(19, 23, 34, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--cad-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reference-canvas-tools {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 5;
+  background: rgba(19, 23, 34, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--cad-border);
+  border-radius: 6px;
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+}
+
+.reference-canvas-tools button {
+  font-size: 10px;
+  padding: 4px 8px;
+  background: var(--cad-surface-elevated);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: 4px;
+}
+
+.reference-canvas-tools button.active {
+  background: var(--cad-accent);
+  border-color: var(--cad-accent-hover);
+  color: #fff;
+}
+
+/* 3D Viewport */
+.stage-content #model-viewport {
+  position: absolute;
+  inset: 0;
+  height: 100%;
+  background: radial-gradient(circle at 50% 40%, #1c2333 0%, #0d1017 100%);
+  display: none;
+}
+
+.cad-stage[data-mode=model] .drawing-pane { visibility: hidden; }
+.cad-stage[data-mode=model] #model-viewport { display: block; }
+
+/* DUAL / SPLIT VIEW (2D Blueprint ⬌ 3D Solid Model) */
+.cad-stage[data-mode=split] .stage-content {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 4px !important;
+  background: #0f1218 !important;
+}
+
+.cad-stage[data-mode=split] .drawing-pane {
+  visibility: visible !important;
+  display: flex !important;
+  height: 100% !important;
+  border-right: 1px solid var(--cad-border) !important;
+  position: relative !important;
+}
+
+.cad-stage[data-mode=split] #model-viewport {
+  position: relative !important;
+  inset: auto !important;
+  display: block !important;
+  height: 100% !important;
+}
+
+/* ViewCube */
+.stage-content #cube-wrap {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 140px;
+  height: 146px;
+  z-index: 6;
+  background: rgba(19, 23, 34, 0.7);
+  backdrop-filter: blur(6px);
+  border: 1px solid var(--cad-border);
+  border-radius: 8px;
+  pointer-events: none;
+}
+
+.stage-content #view-cube {
+  width: 140px;
+  height: 110px;
+  pointer-events: auto;
+}
+
+.stage-content .cube-caption {
+  bottom: 4px;
+  font-size: 10px;
+  text-align: center;
+}
+
+.stage-content .cube-caption strong {
+  font-size: 10px;
+  color: var(--cad-accent-hover);
+  letter-spacing: 0.5px;
+}
+
+.stage-content .cube-caption small {
+  font-size: 8px;
+  color: var(--cad-text-dim);
+}
+
+.stage-content #view-shortcuts {
+  position: absolute;
+  right: 10px;
+  top: 162px;
+  width: 140px;
+  padding: 0;
+  z-index: 6;
+  gap: 3px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.stage-content #view-shortcuts button {
+  font-size: 9px;
+  padding: 3px 2px;
+  background: rgba(22, 26, 36, 0.85);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text-muted);
+  border-radius: 3px;
+}
+
+.stage-content #view-shortcuts .mapped {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--cad-success-hover);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.document-tabs {
+  height: 28px;
+  background: #11141c;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  border-top: 1px solid var(--cad-border);
+  padding: 0 10px;
+}
+
+.document-tabs > span.active {
+  padding: 4px 12px;
+  background: var(--cad-surface);
+  border: 1px solid var(--cad-border);
+  border-bottom: 0;
+  border-radius: 4px 4px 0 0;
+  color: var(--cad-accent-hover);
+  font-weight: 500;
+}
+
+.document-tabs #sketch-hint {
+  font-size: 10px;
+  color: var(--cad-text-dim);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 5. Right Dock: Parameters, Features & Export Hub */
+.tasks-dock .model-settings {
+  padding: 12px;
+  overflow: auto;
+}
+
+.tasks-dock .section-heading {
+  border: 1px solid var(--cad-border);
+  background: #12151e;
+  padding: 8px 10px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+}
+
+.tasks-dock .section-heading strong {
+  font-size: 12px;
+  color: var(--cad-accent-hover);
+}
+
+.sketch-dimensions {
+  margin: 10px 0;
+  border: 1px solid var(--cad-border);
+  background: #11151e;
+  border-radius: 6px;
+  padding: 10px;
+}
+
+.sketch-dimensions .dock-title {
+  margin: -10px -10px 10px -10px;
+  border-radius: 6px 6px 0 0;
+}
+
+.sketch-dimensions label {
+  font-size: 11px;
+  display: grid;
+  grid-template-columns: 1fr 100px;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0;
+  color: var(--cad-text-muted);
+}
+
+.sketch-dimensions button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 6px;
+}
+
+.tasks-dock .align-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.tasks-dock .align-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--cad-text-muted);
+}
+
+.tasks-dock .feature-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.tasks-dock .feature-actions button {
+  font-size: 11px;
+  padding: 7px;
+  border-radius: 4px;
+}
+
+.tasks-dock .report {
+  border: 1px solid var(--cad-border);
+  background: #11151e;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--cad-text-muted);
+  padding: 8px 10px;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+/* Primary Recompute Solid Button */
+.tasks-dock .primary {
+  border: 1px solid var(--cad-accent-hover);
+  border-radius: 6px;
+  background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+  color: #fff;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+  margin: 10px 0;
+  transition: all 0.2s ease;
+}
+
+.tasks-dock .primary:hover {
+  background: linear-gradient(180deg, #0369a1 0%, #075985 100%);
+  box-shadow: 0 4px 16px rgba(56, 189, 248, 0.4);
+}
+
+/* Export Hub Buttons */
+.tasks-dock .export-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tasks-dock .export-actions button {
+  font-size: 11px;
+  padding: 8px 6px;
+  font-weight: 500;
+  background: var(--cad-surface-elevated);
+  border: 1px solid var(--cad-border);
+  color: var(--cad-text);
+  border-radius: 4px;
+}
+
+.tasks-dock .export-actions button:hover {
+  background: var(--cad-surface-hover);
+  border-color: var(--cad-accent-hover);
+  color: #fff;
+}
+
+.tasks-dock .confirm {
+  font-size: 11px;
+  color: var(--cad-text-muted);
+  margin: 8px 0;
+}
+
+/* Solver & AI Badges */
+.solver-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  border-radius: 6px;
+  margin: 10px;
+}
+
+.solver-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--cad-success);
+  box-shadow: 0 0 8px var(--cad-success);
+}
+
+#solver-title {
+  font-size: 12px;
+  color: var(--cad-success-hover);
+}
 
 .ai-toolbar-button {
-  background: #182822 !important;
+  background: rgba(32, 201, 151, 0.15) !important;
   border: 1px solid #20c997 !important;
   color: #20c997 !important;
   font-weight: 600;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
   cursor: pointer;
-  padding: 3px 8px;
-  border-radius: 3px;
-}
-.ai-toolbar-button:hover {
-  background: #20c99733 !important;
-}
-#hybrid-ai-panel {
-  background: #181d24;
-  border: 1px solid #2e3846;
-  border-radius: 6px;
-  padding: 10px;
-  margin-bottom: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
 }
 
+.ai-toolbar-button:hover {
+  background: rgba(32, 201, 151, 0.3) !important;
+}
+
+/* Menubar Popup */
+#cad-menu {
+  position: fixed;
+  z-index: 100;
+  min-width: 180px;
+  padding: 5px;
+  background: #181d28;
+  border: 1px solid var(--cad-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+#cad-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 6px 12px;
+  color: var(--cad-text);
+  border-radius: 4px;
+}
+
+#cad-menu button:hover {
+  background: var(--cad-accent);
+  color: #fff;
+}
+
+footer {
+  height: 28px;
+  background: #131722;
+  border-top: 1px solid var(--cad-border);
+  font-size: 11px;
+  color: var(--cad-text-dim);
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Responsive Rules */
+@media (max-width: 1050px) {
+  .cad-docks { grid-template-columns: 200px minmax(260px, 1fr) 260px; }
+  .document-title { display: none; }
+}
+
+@media (max-width: 750px) {
+  .cad-docks { grid-template-columns: 1fr; }
+  .model-dock, .tasks-dock { display: none; }
+}

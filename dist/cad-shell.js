@@ -13,7 +13,11 @@ const shell = document.createElement('div');
 shell.id = 'cad-shell';
 shell.innerHTML = `
 <div class="cad-menubar">
-  <div class="brand-title"><span class="fc-logo-icon">🪓</span> <strong>FreeCAD Web</strong></div>
+  <div class="brand-title">
+    <span class="fc-logo-icon">🔷</span>
+    <strong>FreeCAD Web</strong>
+    <span class="brand-badge">2D ➔ 3D CAD</span>
+  </div>
   <button data-menu="file">File</button>
   <button data-menu="edit">Edit</button>
   <button data-menu="view">View</button>
@@ -22,7 +26,10 @@ shell.innerHTML = `
   <button data-menu="ai">🧠 AI 2D→3D</button>
   <button data-menu="help">Help</button>
   <span class="document-title" id="fc-doc-name">Unnamed.FCStd</span>
-  <span class="local-state" id="fc-local-status">● Web CAD Standalone</span>
+  <div class="menubar-right">
+    <a href="index.html" class="nav-back-ocr" title="Chuyển sang tab OCR trích xuất kích thước">📄 Extract numbers (OCR)</a>
+    <span class="local-state" id="fc-local-status">● Web CAD Standalone</span>
+  </div>
 </div>
 
 <div class="cad-toolbar">
@@ -40,6 +47,7 @@ shell.innerHTML = `
     <select id="workbench">
       <option value="sketch">📐 Sketcher</option>
       <option value="model">🧊 Part Design</option>
+      <option value="split">◫ Split View</option>
     </select>
   </label>
 
@@ -75,29 +83,44 @@ shell.innerHTML = `
 </div>
 
 <div class="cad-docks">
-  <!-- Left Dock: FreeCAD Combo View (Model Tree + Property Panel) -->
+  <!-- Left Dock: FreeCAD Combo View (Model Tree + Property Panel + Projections) -->
   <aside class="model-dock">
     <div class="dock-title">
-      <span>Model</span>
-      <button id="toggle-properties" title="Toggle property panel">Properties</button>
+      <div class="dock-mode-tabs" id="left-dock-tabs">
+        <button id="tab-model-tree" class="dock-tab-btn active">🌳 Model Tree</button>
+        <button id="tab-drawing-ref" class="dock-tab-btn">📐 2D Views</button>
+      </div>
+      <button id="toggle-properties" title="Toggle property panel">Props</button>
     </div>
-    <div id="model-tree" role="tree"></div>
-    <div class="property-panel">
-      <div class="dock-title">Property View</div>
-      <dl id="property-grid"></dl>
+    <div id="left-dock-tree-wrap">
+      <div id="model-tree" role="tree"></div>
+      <div class="property-panel">
+        <div class="dock-title">Property View</div>
+        <dl id="property-grid"></dl>
+      </div>
     </div>
-    <details id="drawing-tools">
-      <summary>2D Drawing Reference & Calibration</summary>
+    <div id="left-dock-ref-wrap" hidden>
       <div id="reference-tools"></div>
-    </details>
+    </div>
   </aside>
 
   <!-- Center Stage: 2D Sketcher & 3D Viewport Tabs -->
   <div class="cad-stage" data-mode="sketch">
     <div class="stage-tabs">
-      <button id="view-sketch" class="active">📐 2D Sketcher</button>
-      <button id="view-solid">🧊 3D Solid View</button>
-      <span id="edit-state">Sketcher edit</span>
+      <div class="stage-view-modes">
+        <button id="view-sketch" class="active">📐 2D Sketcher</button>
+        <button id="view-solid">🧊 3D Solid View</button>
+        <button id="view-split">◫ Split View (2D ⬌ 3D)</button>
+      </div>
+      <div class="stage-hud-tools">
+        <button data-command="iso" title="Isometric View">Iso</button>
+        <button data-command="top" title="Top View">Top</button>
+        <button data-command="front" title="Front View">Front</button>
+        <button data-command="right" title="Right View">Right</button>
+        <button data-command="fit" title="Fit (Ctrl+0)">Fit</button>
+        <button data-command="toggle-wireframe" title="Toggle Wireframe Edges">Edges</button>
+      </div>
+      <span id="edit-state">2D Sketcher Edit</span>
     </div>
     <div class="stage-content"></div>
     <div class="document-tabs">
@@ -106,16 +129,18 @@ shell.innerHTML = `
     </div>
   </div>
 
-  <!-- Right Dock: FreeCAD Task Panel & AI Chat Assistant -->
+  <!-- Right Dock: Parameters, AI Assistant & Solver Tasks -->
   <aside class="tasks-dock">
     <div class="dock-title">
-      <div class="dock-mode-tabs" style="display:flex;gap:4px;">
-        <button id="tab-dock-chat" class="active" style="padding:3px 8px;font-size:11px;border-radius:4px;background:#20c997;color:#181d24;border:none;font-weight:600;cursor:pointer;">💬 AI Chat</button>
-        <button id="tab-dock-tasks" style="padding:3px 8px;font-size:11px;border-radius:4px;background:#262d38;color:#adb5bd;border:none;cursor:pointer;">📋 Tasks & Solver</button>
+      <div class="dock-mode-tabs">
+        <button id="tab-dock-params" class="dock-tab-btn active">⚙️ Parameters & Solid</button>
+        <button id="tab-dock-chat" class="dock-tab-btn">💬 AI Chat</button>
+        <button id="tab-dock-tasks" class="dock-tab-btn">📋 Tasks</button>
       </div>
-      <button id="tasks-close">Close Task</button>
+      <button id="tasks-close">Close</button>
     </div>
-    <div id="ai-chat-container"></div>
+    <div id="tasks-content"></div>
+    <div id="ai-chat-container" hidden></div>
     <div id="task-context" hidden>
       <div class="solver-badge" id="solver-badge">
         <span class="solver-dot"></span>
@@ -123,7 +148,6 @@ shell.innerHTML = `
       </div>
       <p id="solver-desc">Draw closed 2D geometry, then click Pad to create a 3D solid.</p>
     </div>
-    <div id="tasks-content" hidden></div>
   </aside>
 </div>
 
@@ -189,38 +213,51 @@ shell.querySelectorAll('[data-command]').forEach(b => b.onclick = () => dispatch
 $('blank-start').onclick = () => dispatch('new-sketch');
 $('view-sketch').onclick = () => dispatch('sketch-view');
 $('view-solid').onclick = () => dispatch('model-view');
+$('view-split').onclick = () => dispatch('split-view');
 
 // Workbench switcher updates UI view & toolbars
 $('workbench').onchange = () => {
   const wb = $('workbench').value;
-  dispatch(wb === 'model' ? 'model-view' : 'sketch-view');
+  if (wb === 'split') dispatch('split-view');
+  else dispatch(wb === 'model' ? 'model-view' : 'sketch-view');
   shell.querySelectorAll('.sketch-strip').forEach(el => el.classList.toggle('hidden-strip', wb === 'model'));
 };
 
+// Left Dock Tab Navigation: Model Tree vs 2D Views
+$('tab-model-tree').onclick = () => {
+  $('tab-model-tree').classList.add('active');
+  $('tab-drawing-ref').classList.remove('active');
+  $('left-dock-tree-wrap').hidden = false;
+  $('left-dock-ref-wrap').hidden = true;
+};
+$('tab-drawing-ref').onclick = () => {
+  $('tab-drawing-ref').classList.add('active');
+  $('tab-model-tree').classList.remove('active');
+  $('left-dock-tree-wrap').hidden = true;
+  $('left-dock-ref-wrap').hidden = false;
+};
+
+// Right Dock Tab Navigation: Parameters & Solid, AI Chat, Tasks
+const showRightTab = (tab) => {
+  ['params', 'chat', 'tasks'].forEach(t => {
+    $(`tab-dock-${t}`)?.classList.toggle('active', t === tab);
+  });
+  $('tasks-content').hidden = tab !== 'params';
+  $('ai-chat-container').hidden = tab !== 'chat';
+  $('task-context').hidden = tab !== 'tasks';
+};
+$('tab-dock-params').onclick = () => showRightTab('params');
+$('tab-dock-chat').onclick = () => showRightTab('chat');
+$('tab-dock-tasks').onclick = () => showRightTab('tasks');
+
 $('tasks-close').onclick = () => dispatch('close-task');
 
-$('tab-dock-chat').onclick = () => {
-  $('tab-dock-chat').classList.add('active');
-  $('tab-dock-chat').style.background = '#20c997';
-  $('tab-dock-chat').style.color = '#181d24';
-  $('tab-dock-tasks').classList.remove('active');
-  $('tab-dock-tasks').style.background = '#262d38';
-  $('tab-dock-tasks').style.color = '#adb5bd';
-  $('ai-chat-container').hidden = false;
-  $('task-context').hidden = true;
-  $('tasks-content').hidden = true;
-};
-$('tab-dock-tasks').onclick = () => {
-  $('tab-dock-tasks').classList.add('active');
-  $('tab-dock-tasks').style.background = '#20c997';
-  $('tab-dock-tasks').style.color = '#181d24';
-  $('tab-dock-chat').classList.remove('active');
-  $('tab-dock-chat').style.background = '#262d38';
-  $('tab-dock-chat').style.color = '#adb5bd';
-  $('ai-chat-container').hidden = true;
-  $('task-context').hidden = false;
-  $('tasks-content').hidden = false;
-};
+document.querySelector('.nav-back-ocr')?.addEventListener('click', (e) => {
+  if (window.parent && window.parent !== window) {
+    e.preventDefault();
+    window.parent.document.querySelector('#tab-ocr')?.click();
+  }
+});
 
 $('toggle-properties').onclick = () => {
   const panel = document.querySelector('.property-panel');
@@ -247,8 +284,12 @@ const menus = {
   view: [
     ['2D Sketcher View', 'sketch-view'],
     ['3D Solid View', 'model-view'],
+    ['Split View (2D ⬌ 3D)', 'split-view'],
     ['Fit All (Ctrl+0)', 'fit'],
     ['Isometric View', 'iso'],
+    ['Top View', 'top'],
+    ['Front View', 'front'],
+    ['Right View', 'right'],
     ['Toggle Wireframe Edges', 'toggle-wireframe']
   ],
   sketch: [

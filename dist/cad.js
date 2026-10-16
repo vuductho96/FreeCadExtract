@@ -847,10 +847,11 @@ $('empty-demo')?.addEventListener('click', demo);
 function switchView(mode) {
   const stage = document.querySelector('.cad-stage');
   stage.dataset.mode = mode;
-  $('view-sketch').classList.toggle('active', mode === 'sketch');
-  $('view-solid').classList.toggle('active', mode === 'model');
+  $('view-sketch')?.classList.toggle('active', mode === 'sketch');
+  $('view-solid')?.classList.toggle('active', mode === 'model');
+  $('view-split')?.classList.toggle('active', mode === 'split');
   $('workbench').value = mode === 'model' ? 'model' : 'sketch';
-  $('edit-state').textContent = mode === 'sketch' ? '2D Sketcher Edit' : '3D PartDesign Solid';
+  $('edit-state').textContent = mode === 'sketch' ? '2D Sketcher Edit' : mode === 'split' ? 'Split View (2D ⬌ 3D)' : '3D PartDesign Solid';
   document.querySelectorAll('.sketch-strip').forEach(el => el.classList.toggle('hidden-strip', mode === 'model'));
   requestAnimationFrame(() => {
     viewer.resize();
@@ -1012,15 +1013,22 @@ document.addEventListener('cad-command', e => {
   if (cmd === 'new-sketch') return newSketch();
   if (cmd === 'open') return $('cad-file').click();
   if (cmd === 'reset') return $('reset').click();
-  if (cmd === 'sketch-view' || cmd === 'model-view') return switchView(cmd === 'model-view' ? 'model' : 'sketch');
+  if (cmd === 'sketch-view' || cmd === 'model-view' || cmd === 'split-view') return switchView(cmd === 'model-view' ? 'model' : cmd === 'split-view' ? 'split' : 'sketch');
   if (cmd === 'fit') {
-    if (document.querySelector('.cad-stage').dataset.mode === 'model') {
+    const curMode = document.querySelector('.cad-stage').dataset.mode;
+    if (curMode === 'model' || curMode === 'split') {
       viewer.controls.reset();
       viewer.resize();
-    } else fit();
+    }
+    if (curMode === 'sketch' || curMode === 'split') {
+      fit();
+    }
     return;
   }
   if (cmd === 'iso') return $('home-view').click();
+  if (cmd === 'top') return viewer.snap(FACE_DIRECTIONS.Top);
+  if (cmd === 'front') return viewer.snap(FACE_DIRECTIONS.Front);
+  if (cmd === 'right') return viewer.snap(FACE_DIRECTIONS.Right);
   if (cmd === 'toggle-wireframe') {
     $('wireframe').checked = !$('wireframe').checked;
     $('wireframe').dispatchEvent(new Event('change'));
