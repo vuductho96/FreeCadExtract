@@ -30,6 +30,7 @@ export function mountCodeWorkspace({runCode,isConnected,connect,showModel}){
       const result=await runCode(code,{newDocument:$('code-new-doc').checked});
       resultText=[result.ok?'THÀNH CÔNG':'LỖI PYTHON',result.document?'Tài liệu: '+result.document:'',result.elapsedMs!==undefined?'Thời gian Python: '+result.elapsedMs+' ms':'',result.model?`Solid hiển thị: ${result.model.solids} · BRep hợp lệ: ${result.model.valid}\nFeature lỗi: ${result.model.invalidFeatures.join(', ')||'Không có'}`:'',result.stdout,result.stderr,result.traceback,result.syncError?'Chưa đồng bộ được: '+result.syncError:''].filter(Boolean).join('\n\n');$('code-output').textContent=resultText;
       $('code-status').textContent=result.ok?(result.syncError?'Script đã chạy xong; cần Đồng bộ lại để xem mô hình.':'Đã chạy và đồng bộ mô hình từ FreeCAD. Mở bảng FreeCAD để xuất file.'):'Mã có lỗi. Xem traceback bên dưới; dữ liệu đang dựng có thể còn trong FreeCAD.';
+      pane.querySelector('.code-results').open=true;
       if(result.ok&&!result.syncError&&$('code-auto-view').checked){close();showModel();}
     }catch(e){resultText=e.message;$('code-output').textContent=resultText;$('code-status').textContent='Chưa xác nhận chạy xong. Kiểm tra kết nối và Đồng bộ trước khi chạy lại.';}
     finally{running=false;$('cad-python').readOnly=false;$('code-allow').checked=false;update();}
