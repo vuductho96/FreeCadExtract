@@ -1,11 +1,15 @@
 {
-  "name": "freescan-drawing-standalone",
+  "name": "freescan-drawing-cloudflare",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node serve.mjs",
     "prepare:cad": "node build-cad-vendor.mjs",
-    "test": "node tests/dimension-parser.mjs && node tests/cad-kernel.mjs && node tests/gemini-cad.mjs && node tests/freecad-sketcher.mjs && node tests/hybrid-cad-solver.mjs && node tests/freecad-code.mjs && node tests/browser-code.mjs && node local-bridge/test-suite.mjs && node local-bridge/test-launch.mjs"
+    "test": "node tests/dimension-parser.mjs && node tests/cad-kernel.mjs && node tests/gemini-cad.mjs && node tests/freecad-sketcher.mjs && node tests/hybrid-cad-solver.mjs && node tests/freecad-code.mjs && node tests/browser-code.mjs && node local-bridge/test-suite.mjs && node local-bridge/test-launch.mjs",
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "deploy:cloudflare": "node scripts/deploy-cloudflare.mjs",
+    "cloudflare:login": "npx --yes wrangler@4.86.0 login",
+    "cloudflare:check": "npx --yes wrangler@4.86.0 deploy --dry-run"
   },
   "keywords": [],
   "author": "",

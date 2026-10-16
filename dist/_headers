@@ -1,0 +1,10 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Cache-Control: no-cache
+/models/*
+  Cache-Control: public, max-age=86400
+/vendor/*
+  Cache-Control: public, max-age=3600
+/*.wasm
+  Content-Type: application/wasm

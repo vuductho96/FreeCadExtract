@@ -1,3 +1,4 @@
+import {getSite} from './site.mjs';
 import http from 'node:http';
 import net from 'node:net';
 import {randomBytes,timingSafeEqual} from 'node:crypto';
@@ -86,7 +87,7 @@ function equalSecret(a,b){const x=Buffer.from(a||''),y=Buffer.from(b);return x.l
 async function socketAvailable(){return new Promise(ok=>{const s=net.connect(12345,'127.0.0.1');s.setTimeout(800);s.once('connect',()=>{s.end();ok(true);});s.once('error',()=>ok(false));s.once('timeout',()=>{s.destroy();ok(false);});});}
 export async function startBridge(options={}){
   const port=options.port??Number(process.env.FREESCAN_PORT||8876);
-  const publicSite='http://127.0.0.1:5174';
+  const publicSite=await getSite();
   const origins=new Set([publicSite,'http://127.0.0.1:5174','http://localhost:5174',...(options.origins||[])]);
   const token=options.token||randomBytes(32).toString('hex');
   const folder=resolve(options.folder||join(homedir(),'FreeScanDrawing-Standalone','local-files'));

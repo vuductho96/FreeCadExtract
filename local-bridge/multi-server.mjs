@@ -1,7 +1,8 @@
+import {getSite} from './site.mjs';
 import http from 'node:http';import {randomBytes,timingSafeEqual,randomUUID} from 'node:crypto';
 import {mkdir,writeFile,readFile,stat} from 'node:fs/promises';import {join,resolve} from 'node:path';import {homedir} from 'node:os';import {pathToFileURL} from 'node:url';
 import {solidworksAdapter,sketchupAdapter} from './adapters/native.mjs';
-const site='http://127.0.0.1:5174';
+const site=await getSite();
 export async function startSuite(options={}){
  const token=options.token||randomBytes(32).toString('hex'),folder=resolve(options.folder||join(homedir(),'FreeScanDrawing-Standalone','cad-suite')),exportDir=join(folder,'exports');
  await mkdir(exportDir,{recursive:true});

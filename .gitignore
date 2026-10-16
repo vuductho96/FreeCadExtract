@@ -15,3 +15,8 @@ node_modules/
 .openai/
 local-files/
 cad-suite/
+
+.wrangler/
+.cloudflare/
+.dev.vars
+.dev.vars.*

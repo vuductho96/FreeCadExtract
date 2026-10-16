@@ -1,0 +1,9 @@
+{
+  "name": "freescan-drawing",
+  "compatibility_date": "2026-05-03",
+  "assets": {
+    "directory": "./.cloudflare/public",
+    "html_handling": "none",
+    "not_found_handling": "404-page"
+  }
+}

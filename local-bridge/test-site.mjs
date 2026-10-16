@@ -1,0 +1,3 @@
+import assert from 'node:assert/strict';import {getSite} from './site.mjs';
+const original=process.env.FREESCAN_SITE_ORIGIN;
+try{delete process.env.FREESCAN_SITE_ORIGIN;assert.equal(await getSite(),'http://127.0.0.1:5174');process.env.FREESCAN_SITE_ORIGIN='https://freescan.example';assert.equal(await getSite(),'https://freescan.example');for(const value of ['http://untrusted.example','https://user:pass@example.com','https://example.com/path','https://example.com?x=1']){process.env.FREESCAN_SITE_ORIGIN=value;await assert.rejects(getSite());}console.log('Exact Cloudflare bridge origin validation passed.');}finally{if(original===undefined)delete process.env.FREESCAN_SITE_ORIGIN;else process.env.FREESCAN_SITE_ORIGIN=original;}

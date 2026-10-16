@@ -53,3 +53,7 @@ Xem `DEVELOPMENT.md`, `AGENTS.md`, `HANDOFF-PROMPT.md` và `docs/UPSTREAM_README
 ## Giới hạn file CAD
 
 STEP giữ solid hình học, không khôi phục Sketch/ràng buộc/lịch sử thiết kế. FCStd hoặc SLDPRT chỉ giữ lịch sử thật do code dựng. SKP là model SketchUp, không phải cây feature FreeCAD. Code native chạy bằng quyền tài khoản của bạn; đọc mã trước khi cho phép chạy.
+
+## Cloudflare edition
+
+This folder also supports Cloudflare Workers Static Assets. See CLOUDFLARE.md before publishing. The assets directory for Wrangler is .cloudflare/public, built from dist. Cloudflare hosting is optional; source and local workflow stay usable without ChatGPT Plus. Do not commit .wrangler credentials or .dev.vars. Always configure the exact deployed origin for downloadable native bridges.
