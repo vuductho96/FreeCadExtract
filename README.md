@@ -5,7 +5,7 @@ Không cần ChatGPT Plus, đăng nhập OpenAI, Sites hoặc API key để mở
 
 ## Mở ngay trên máy này
 
-1. Bấm đúp **Start-App.cmd**, giữ cửa sổ server mở.
+1. Bấm đúp **StartApp.bat**: tự mở web + FreeCAD + macro + cầu nối trong MỘT cửa sổ điều khiển. Giữ cửa sổ này mở.
 2. Mở **http://127.0.0.1:5174**. Có tab OCR và 2D → 3D giống bản web.
 3. Dựng ngay trên web: chọn JavaScript, nạp mẫu hoặc dán Replicad code rồi chạy; xuất STEP/STL.
 4. Dùng FreeCAD: bấm **Connect-FreeCAD.cmd**, sau đó ở trang ghép nối bấm mở website và xác nhận Kết nối. Dán Python; xuất FCStd để giữ cây feature mà code tạo ra.
@@ -53,3 +53,11 @@ Xem `DEVELOPMENT.md`, `AGENTS.md`, `HANDOFF-PROMPT.md` và `docs/UPSTREAM_README
 ## Giới hạn file CAD
 
 STEP giữ solid hình học, không khôi phục Sketch/ràng buộc/lịch sử thiết kế. FCStd hoặc SLDPRT chỉ giữ lịch sử thật do code dựng. SKP là model SketchUp, không phải cây feature FreeCAD. Code native chạy bằng quyền tài khoản của bạn; đọc mã trước khi cho phép chạy.
+
+## Một lần bấm cho từng chế độ
+
+- **StartApp.bat**: web + FreeCAD + macro + cầu nối, rồi mở trang ghép nối. Không phải chạy Connect-FreeCAD riêng.
+- **StartWeb.bat**: chỉ web/OCR/JavaScript CAD, không cần FreeCAD.
+- **StartCAD.bat**: web + cầu nối SolidWorks/SketchUp. Hai phần mềm này vẫn cần mở/cài extension theo hướng dẫn.
+
+Các file CMD cũ là alias đến launcher mới. Đóng/Ctrl+C cửa sổ điều khiển để dừng dịch vụ do nó khởi động; không đóng tài liệu FreeCAD. Dịch vụ đã tồn tại sẽ được dùng lại, không tự tắt ứng dụng khác. `node start-app.mjs --check` chỉ kiểm tra, không khởi động.
