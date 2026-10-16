@@ -1,3 +1,4 @@
+import {mountCadSuite} from './cad-suite.js';
 import {mountCodeLayout} from './cad-code-layout.js';
 // import {mountGeminiPanel} from './gemini-panel.js';
 import {mountLocalFreecad} from './freecad-local.js';
@@ -1463,3 +1464,5 @@ export const aiChat = mountAiChat($('ai-chat-container'), {
 newSketch();
 
 mountCodeLayout();
+
+mountCadSuite({showMesh:(mesh,engine)=>{document.querySelector('.browser-code-result').hidden=true;viewer.show(mesh);switchView('model');document.getElementById('doc-tab-label').textContent=engine+' · preview mm';}});

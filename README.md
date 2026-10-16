@@ -86,3 +86,9 @@ Browser mode validates BRep/solid count/volume, displays the mesh and exports re
 Verification: `node tests/browser-code.mjs` checks exact pocket volume, valid solid, STEP import roundtrip, STL and invalid-code handling using the actual WASM kernel.
 
 The CAD page now opens a focused FreeCAD-style code dock and 3D viewport. Browser JavaScript and desktop FreeCAD Python are separate engines; native FCStd/STEP/STL actions are exposed directly in the code dock. STEP preserves solid geometry, not the original feature/constraint history. For editable Sketch/Pad/Pocket history, use parametric Python in FreeCAD and export FCStd. The native test reopens FCStd and changes Pocket depth while keeping both sketches fully constrained.
+
+### SolidWorks / SketchUp connectors (initial adapters)
+
+The code dock now includes **SolidWorks / SketchUp**. Download the bridge ZIP, run Ket-noi-CAD.cmd and pair the CAD Suite endpoint on loopback 8767. FreeCAD remains separate on 8766. SolidWorks attaches through Windows COM and accepts PowerShell scripts; Part exports use SLDPRT/STEP/STL. SketchUp Desktop uses the supplied Ruby extension (.rbz), accepts Ruby scripts, exports native SKP and supplies mesh preview. SketchUp Web, STEP from SketchUp and SolidWorks web tessellation are not implemented. Native formats retain only the editable structure actually created by the supplied script.
+
+See local-bridge/adapters/README.md for setup and official API references. Tests: node local-bridge/test-suite.mjs (mock adapters, auth/host/CORS, consent, replay, format restrictions, download IDs, mesh). Both applications were unavailable on the development machine; native execution/export needs validation on installed licensed apps. Actual status checks correctly report unavailable COM/Ruby services. No native SolidWorks/SketchUp success is claimed by protocol tests.
