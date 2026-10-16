@@ -32,7 +32,16 @@ export async function buildSolid(spec) {
   let pen = cad.draw(spec.profile[0]);
   for (const p of spec.profile.slice(1)) pen = pen.lineTo(p);
   if(spec.circle){number(spec.circle.radius,'circle radius',true);spec.circle.center.forEach(v=>number(v,'circle center'));}
-  let shape = spec.circle ? cad.drawCircle(spec.circle.radius).translate(spec.circle.center[0],spec.circle.center[1]).sketchOnPlane('XY').extrude(spec.depth) : pen.close().sketchOnPlane('XY').extrude(spec.depth);
+  const sketch = spec.circle ? cad.drawCircle(spec.circle.radius).translate(spec.circle.center[0],spec.circle.center[1]).sketchOnPlane('XY') : pen.close().sketchOnPlane('XY');
+  let shape;
+  if (spec.revolve) {
+    const revAxis = String(spec.revolveAxis || 'Y').toUpperCase() === 'X' ? [1,0,0] : [0,1,0];
+    shape = sketch.revolve(revAxis, { angle: spec.revolveAngle || 360 });
+  } else if (spec.symmetric) {
+    shape = sketch.extrude(spec.depth).translate(0, 0, -spec.depth / 2);
+  } else {
+    shape = sketch.extrude(spec.depth);
+  }
   try {
     const box = shape.boundingBox, [min, max] = box.bounds; box.delete();
     for (const hole of spec.holes || []) {

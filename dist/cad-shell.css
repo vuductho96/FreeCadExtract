@@ -8,3 +8,32 @@
 .feature-dialog{border:1px solid #aaa;border-radius:3px;padding:18px;min-width:280px;color:#222;background:#f4f4f4}.feature-dialog::backdrop{background:#0004}.feature-dialog h3{font-size:14px;margin:0 0 15px}.feature-dialog label{display:grid;grid-template-columns:1fr 100px;gap:12px;align-items:center;margin:8px 0;font-size:12px}.feature-dialog input,.feature-dialog select{width:100%;padding:5px}.feature-dialog form>div{display:flex;gap:6px;justify-content:flex-end;margin-top:14px}
 
 .tasks-dock>.dock-title{position:sticky;top:0;z-index:5}.tasks-dock #tasks-content{min-width:0}
+
+/* FreeCAD Web Clone Styling */
+.brand-title{display:flex;align-items:center;gap:6px;margin-right:15px;font-size:13px;color:#183247}
+.fc-logo-icon{font-size:16px}
+.command-strip button.active,.command-strip button:active{background:#d2e6fa!important;border-color:#339af0!important;box-shadow:inset 0 1px 2px rgba(0,0,0,0.12)}
+#btn-construction.active{background:#e7f5ff!important;border-color:#339af0!important;color:#1c7ed6}
+#btn-grid-snap.active{background:#ebfbee!important;border-color:#20c997!important}
+.btn-finish-sketch{background:#ebfbee!important;border-color:#40c057!important;color:#2b8a3e}
+.btn-finish-sketch:hover{background:#d3f9d8!important}
+.sketch-strip.hidden-strip{display:none!important}
+.part-strip.hidden-strip{display:none!important}
+
+.solver-badge{display:flex;align-items:center;gap:8px;padding:6px 8px;background:#e6fcf5;border:1px solid #96f2d7;border-radius:3px;margin-bottom:6px}
+.solver-badge.under-constrained{background:#fff9db;border-color:#ffe066}
+.solver-badge.invalid{background:#fff5f5;border-color:#ffc9c9}
+.solver-dot{width:10px;height:10px;border-radius:50%;background:#20c997;display:inline-block;box-shadow:0 0 5px #20c997}
+.solver-badge.under-constrained .solver-dot{background:#fcc419;box-shadow:0 0 5px #fcc419}
+.solver-badge.invalid .solver-dot{background:#ff6b6b;box-shadow:0 0 5px #ff6b6b}
+#solver-title{font-size:11px;color:#0ca678}
+.solver-badge.under-constrained #solver-title{color:#e67700}
+.solver-badge.invalid #solver-title{color:#c92a2a}
+
+.fc-modal-help{border:1px solid #999;border-radius:6px;padding:20px;max-width:500px;background:#fff;color:#222;font:13px/1.6 system-ui}
+.fc-modal-help::backdrop{background:rgba(0,0,0,0.4)}
+.fc-modal-help h3{margin-top:0;font-size:16px;color:#183247}
+.fc-modal-help table{width:100%;border-collapse:collapse;margin:12px 0}
+.fc-modal-help th,.fc-modal-help td{padding:6px 8px;border-bottom:1px solid #eee;text-align:left;font-size:12px}
+.fc-modal-help kbd{background:#f1f3f5;border:1px solid #ced4da;border-radius:3px;padding:2px 6px;font-family:monospace;font-size:11px}
+

@@ -1,95 +1,1274 @@
 import {mountGeminiPanel} from './gemini-panel.js';
 import {mountLocalFreecad} from './freecad-local.js';
 import {validateProposal} from './gemini-cad.js';
+import {FreeCadSketcher} from './freecad-sketcher.js';
 import './cad-shell.js';
 import * as pdfjs from './vendor/pdf.mjs';
 import {OcrClient} from './ocr-client.js';
 import {CadViewer,FACE_DIRECTIONS} from './cad-viewer.js';
 import {analyzeCrop,toModel,viewAxes} from './cad-geometry.js';
-pdfjs.GlobalWorkerOptions.workerSrc=new URL('./vendor/pdf.worker.mjs',import.meta.url).href;
-const $=id=>document.getElementById(id),status=t=>$('cad-status').textContent=t,source=document.createElement('canvas'),display=$('source-canvas'),ctx=display.getContext('2d');let pdf=null,page=1,crops=[],selected=null,full=true,tool='pan',zoom=1,offset=[20,20],gesture=null,points=[],profile=[],profileClosed=false,holes=[],pockets=[],built=false,mesh=null,sourceName='',cropSequence=0,worker=null,sequence=0,requests=new Map(),kernelBusy=false,ocrBusy=false;const ocr=new OcrClient(status),viewer=new CadViewer(face=>chooseFace(face));
-let lastAIProposal=null;let aiProposalMode=false;let standalone=false,circleProfile=null,undoStack=[],redoStack=[],restoring=false;
-source.width=0;source.height=0;
-function active(){return crops.find(c=>c.id===selected);}
-function invalidate(){built=false;updateTree();if(mesh){$('model-empty').hidden=false;$('model-empty').textContent='Preview is out of date · Apply / Recompute';}$('confirm-geometry').checked=false;document.querySelectorAll('[data-export],#export-source,#export-macro').forEach(b=>b.disabled=true);$('model-metrics').textContent=mesh?'Geometry changed. Rebuild before exporting.':'';draw();}
-function canvas(w,h){const c=document.createElement('canvas');c.width=w;c.height=h;return c;}
-function currentCanvas(){return full?source:active()?.canvas||source;}
-function fit(){const c=currentCanvas(),r=$('source-viewport').getBoundingClientRect();if(!c.width)return;zoom=Math.max(.22,Math.min((r.width-30)/c.width,(r.height-30)/c.height));offset=[(r.width-c.width*zoom)/2,(r.height-c.height*zoom)/2];draw();}
-function draw(){const r=$('source-viewport').getBoundingClientRect(),dpr=Math.min(devicePixelRatio,2);display.width=Math.max(1,r.width*dpr);display.height=Math.max(1,r.height*dpr);ctx.scale(dpr,dpr);ctx.fillStyle=standalone?'#fafafa':'#e9edf4';ctx.fillRect(0,0,r.width,r.height);const c=currentCanvas();if(!c.width)return;ctx.save();ctx.translate(...offset);ctx.scale(zoom,zoom);ctx.fillStyle='white';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(c,0,0);if(standalone&&!full)drawSketchGrid(c);ctx.lineWidth=1.5/zoom;if(full){for(const cr of crops){if(cr.page!==page)continue;ctx.strokeStyle=cr.id===selected?'#2563eb':'#149b87';ctx.strokeRect(cr.rect.x,cr.rect.y,cr.rect.w,cr.rect.h);ctx.fillStyle=ctx.strokeStyle;ctx.font=`${12/zoom}px sans-serif`;ctx.fillText(cr.face||`Crop ${cr.id}`,cr.rect.x,cr.rect.y-4/zoom);}}else{const cr=active();if(cr){ctx.strokeStyle=standalone?'transparent':'#e78c23';ctx.setLineDash([5/zoom,4/zoom]);ctx.beginPath();ctx.moveTo(cr.origin[0],0);ctx.lineTo(cr.origin[0],c.height);ctx.moveTo(0,cr.origin[1]);ctx.lineTo(c.width,cr.origin[1]);ctx.stroke();ctx.setLineDash([]);if(cr.analysis){ctx.strokeStyle='#ac82cf';for(const circle of cr.analysis.circles){ctx.beginPath();ctx.arc(circle.cx,circle.cy,circle.r,0,Math.PI*2);ctx.stroke();}}if(cr.face==='Top'&&profile.length&&!circleProfile){ctx.strokeStyle='#149b87';ctx.fillStyle='#149b8720';ctx.beginPath();profile.forEach((p,i)=>{const q=[cr.origin[0]+p[0]/cr.mm,cr.origin[1]-p[1]/cr.mm];i?ctx.lineTo(...q):ctx.moveTo(...q);});if(profileClosed){ctx.closePath();ctx.fill();}ctx.stroke();}if(circleProfile&&cr.face==='Top'){ctx.strokeStyle='#228844';ctx.beginPath();ctx.arc(cr.origin[0]+circleProfile.center[0]/cr.mm,cr.origin[1]-circleProfile.center[1]/cr.mm,circleProfile.radius/cr.mm,0,Math.PI*2);ctx.stroke();}if($('overlay').checked&&mesh&&cr.mm&&cr.face)drawOverlay(cr);}}ctx.strokeStyle='#2563eb';ctx.fillStyle='#2563eb';for(const p of points){ctx.beginPath();ctx.arc(...p,3/zoom,0,Math.PI*2);ctx.fill();}if(points.length===2){ctx.beginPath();ctx.moveTo(...points[0]);ctx.lineTo(...points[1]);ctx.stroke();}if(['crop','rectangle','pocket'].includes(gesture?.type)&&gesture.end){const a=gesture.start,b=gesture.end;ctx.fillStyle='#2563eb20';ctx.fillRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);ctx.strokeRect(a[0],a[1],b[0]-a[0],b[1]-a[1]);}ctx.restore();$('source-zoom').textContent=Math.round(zoom*100)+'%';}
-function drawOverlay(cr){ctx.save();ctx.globalAlpha=Number($('overlay-opacity').value);ctx.strokeStyle='#e84460';ctx.lineWidth=1.5/zoom;const e=viewer.edgePositions;if(!e||!viewAxes(cr.face))return;const axis=viewAxes(cr.face),indices=axis.map(a=>({X:0,Y:1,Z:2}[a])),sign=cr.face==='Back'||cr.face==='Left'||cr.face==='Bottom'?-1:1;ctx.beginPath();for(let i=0;i<e.length;i+=6){const p=[e[i+indices[0]]*sign,e[i+indices[1]]],q=[e[i+3+indices[0]]*sign,e[i+3+indices[1]]];ctx.moveTo(cr.origin[0]+p[0]/cr.mm,cr.origin[1]-p[1]/cr.mm);ctx.lineTo(cr.origin[0]+q[0]/cr.mm,cr.origin[1]-q[1]/cr.mm);}ctx.stroke();ctx.restore();}
-new ResizeObserver(()=>draw()).observe($('source-viewport'));
-function setTool(t){tool=t;points=[];gesture=null;document.querySelectorAll('[data-tool]').forEach(b=>b.classList.toggle('active',b.dataset.tool===t));if(!['pan','crop'].includes(t)){if(!active()){status('Select a crop first.');tool='pan';return;}full=false;fit();}status(({pan:'Drag to pan. Wheel to zoom.',crop:'Drag a view rectangle on the full drawing.',calibrate:'Click two endpoints of a known dimension. Reference length is in the inspector.',origin:'Click the shared origin in this view.',extent:'Click two part-boundary points horizontally or vertically to constrain that axis.',pocket:'Set Pocket depth in Tasks, then drag a rectangle on the sketch.',rectangle:'Drag opposite corners to draw a rectangle.',circle:'Click the center, then the radius point.',profile:'Top view: click outline vertices in order. Use Close profile when finished.',hole:'Click a circle center, then a point on its circumference.'})[t]);draw();}
-document.querySelectorAll('[data-tool]').forEach(b=>b.onclick=()=>{if(b.dataset.tool==='crop'){full=true;fit();}setTool(b.dataset.tool);});
-function point(e){const r=display.getBoundingClientRect();return[(e.clientX-r.left-offset[0])/zoom,(e.clientY-r.top-offset[1])/zoom];}
-display.onpointerdown=e=>{if(!source.width)return;const p=point(e);if(tool!=='pan')remember();if(tool==='pan'||e.button===1){gesture={type:'pan',x:e.clientX,y:e.clientY,offset:[...offset]};}else if(tool==='crop'||tool==='rectangle'||tool==='pocket'){gesture={type:tool,start:p,end:p};}else handlePoint(p);display.setPointerCapture(e.pointerId);};display.onpointermove=e=>{if(!gesture)return;if(gesture.type==='pan')offset=[gesture.offset[0]+e.clientX-gesture.x,gesture.offset[1]+e.clientY-gesture.y];else gesture.end=point(e);draw();};display.onpointerup=e=>{if(gesture?.type==='pocket'){const c=active(),a=toModel(c,gesture.start),b=toModel(c,point(e)),d=Number($('pocket-depth').value),height=Number($('model-height').value);if(d>0&&Math.abs(a[0]-b[0])>.01&&Math.abs(a[1]-b[1])>.01){pockets.push({origin:[Math.min(a[0],b[0]),Math.min(a[1],b[1]),Math.max(0,height-d)],size:[Math.abs(a[0]-b[0]),Math.abs(a[1]-b[1]),Math.min(d,height)+.01]});featureList();invalidate();status('Pocket added. Apply / Recompute to cut the solid.');}}if(gesture?.type==='rectangle'){const c=active(),a=toModel(c,gesture.start),b=toModel(c,point(e));if(Math.abs(a[0]-b[0])>.01&&Math.abs(a[1]-b[1])>.01){profile=[[a[0],a[1]],[b[0],a[1]],[b[0],b[1]],[a[0],b[1]]];profileClosed=true;circleProfile=null;invalidate();status('Rectangle closed. Use Pad to create a solid.');updateTree();}}if(gesture?.type==='crop'){const a=gesture.start,b=point(e),x=Math.max(0,Math.floor(Math.min(a[0],b[0]))),y=Math.max(0,Math.floor(Math.min(a[1],b[1]))),w=Math.min(source.width-x,Math.ceil(Math.abs(a[0]-b[0]))),h=Math.min(source.height-y,Math.ceil(Math.abs(a[1]-b[1])));if(w>=10&&h>=10){const c=canvas(w,h);c.getContext('2d').drawImage(source,x,y,w,h,0,0,w,h);const cr={id:++cropSequence,canvas:c,rect:{x,y,w,h},page,face:null,mm:null,origin:[0,h],rotation:0,flipped:false};crops.push(cr);selectCrop(cr.id);$('assign-mode').checked=false;status('Crop added. Label it in Gemini Tasks, or leave Auto for AI to recognize.');}else status('Select a region at least 10 × 10 pixels.');}gesture=null;draw();};display.onpointercancel=()=>{gesture=null;draw();};display.onwheel=e=>{e.preventDefault();const p=point(e),r=display.getBoundingClientRect();zoom=Math.max(.22,Math.min(12,zoom*Math.exp(-e.deltaY*.002)));offset=[e.clientX-r.left-p[0]*zoom,e.clientY-r.top-p[1]*zoom];draw();};
-function handlePoint(p){const c=active();if(!c)return;if(p[0]<0||p[1]<0||p[0]>c.canvas.width||p[1]>c.canvas.height)return;if(tool==='origin'){c.origin=p;invalidate();syncFields();alignment();}if(tool==='calibrate'){points.push(p);if(points.length===2){const length=Number($('reference-mm').value),dist=Math.hypot(points[0][0]-p[0],points[0][1]-p[1]);if(length>0&&dist>1){c.mm=length/dist;c.calibration={points:points.map(p=>[...p]),length};syncFields();invalidate();alignment();status('Scale calibrated. Set a shared origin, then trace the Top outline.');}else status('Reference length must be positive and points must differ.');}}if(tool==='extent'){if(!c.mm||!c.face)return status('Calibrate and assign this view first.');points.push(p);if(points.length===2){const [a,b]=points,dx=Math.abs(a[0]-b[0]),dy=Math.abs(a[1]-b[1]),axes=viewAxes(c.face),index=dx>=dy?0:1,axis=axes[index],value=(index===0?dx:dy)*c.mm;c.extents??={};c.extents[axis]=value;if(axis==='Z')$('model-height').value=value.toFixed(4);points=[];invalidate();alignment();status(`${c.face} ${axis} extent constrained to ${value.toFixed(3)} mm.`);}}if(tool==='profile'){circleProfile=null;if(c.face!=='Top'||!c.mm){status('Assign this crop to Top and calibrate it before tracing.');return;}profile.push(toModel(c,p));profileClosed=false;invalidate();$('analysis').textContent=`Profile: ${profile.length} vertices. Click each corner, then Close profile.`;}if(tool==='circle'){if(!c.mm)return status('Set a scale first.');points.push(p);if(points.length===2){const q=toModel(c,points[0]),radius=Math.hypot(points[0][0]-p[0],points[0][1]-p[1])*c.mm;if(radius>.01){circleProfile={center:q,radius};profile=[[q[0]-radius,q[1]-radius],[q[0]+radius,q[1]-radius],[q[0]+radius,q[1]+radius],[q[0]-radius,q[1]+radius]];profileClosed=true;points=[];invalidate();status('Circular sketch closed. Use Pad for a cylinder, or Hole for a subtractive circle.');}}}if(tool==='hole'){if(!c.mm||!c.face){status('Calibrate and assign a face first.');return;}points.push(p);if(points.length===2){const q=toModel(c,points[0]),radius=Math.hypot(points[0][0]-p[0],points[0][1]-p[1])*c.mm,axis=viewAxes(c.face),position={x:0,y:0,z:0};position[axis[0].toLowerCase()]=q[0];position[axis[1].toLowerCase()]=q[1];if(radius>0){holes.push({...position,radius,axis:({Top:'Z',Bottom:'Z',Front:'Y',Back:'Y',Right:'X',Left:'X'})[c.face]});featureList();invalidate();}points=[];}}draw();}
-function selectCrop(id){switchView('sketch');selected=id;full=false;points=[];list();syncFields();fit();$('selected-face').textContent=active()?.face||'Unassigned';}
-function list(){document.dispatchEvent(new Event('cad-crops-changed'));updateTree();const host=$('crop-list');host.replaceChildren();for(const c of crops){const row=document.createElement('div');row.className='crop-card'+(c.id===selected?' selected':'');row.tabIndex=0;row.setAttribute('role','button');row.setAttribute('aria-label',`Select ${c.face||'crop '+c.id}`);const thumb=canvas(c.canvas.width,c.canvas.height);thumb.getContext('2d').drawImage(c.canvas,0,0);const text=document.createElement('div'),title=document.createElement('strong'),info=document.createElement('small');title.textContent=c.face||`Crop ${c.id}`;info.textContent=`P${c.page} · ${c.rect.w}×${c.rect.h}px · ${c.mm?c.mm.toFixed(4)+' mm/px':'Uncalibrated'}`;text.append(title,info);const del=document.createElement('button');del.textContent='×';del.setAttribute('aria-label',`Delete crop ${c.id}`);del.onclick=e=>{e.stopPropagation();crops=crops.filter(x=>x!==c);if(selected===c.id){selected=null;full=true;}invalidate();list();alignment();draw();};row.append(thumb,text,del);row.onclick=()=>selectCrop(c.id);row.onkeydown=e=>{if(e.key==='Enter')selectCrop(c.id);};host.append(row);}viewer.mapped(crops.map(c=>c.face).filter(Boolean));for(const b of $('view-shortcuts').children)b.classList.toggle('mapped',crops.some(c=>c.face===b.textContent));}
-for(const face of Object.keys(FACE_DIRECTIONS)){const b=document.createElement('button');b.textContent=face;b.setAttribute('aria-label',`${face} view`);b.onclick=()=>{viewer.snap(FACE_DIRECTIONS[face]);chooseFace(face);};$('view-shortcuts').append(b);}
-function chooseFace(face){if(standalone){switchView('model');$('cube-direction').textContent=face.toUpperCase();return;}if($('assign-mode').checked){const c=active();if(!c){status('Select a crop to assign first.');return;}const other=crops.find(v=>v.face===face&&v!==c);if(other){status(`${face} already has a crop. Unassign it first.`);return;}c.face=face;invalidate();list();syncFields();$('assign-mode').checked=false;alignment();status(`Crop assigned to ${face}. Camera controls now change the view only.`);}else{const c=crops.find(c=>c.face===face);if(c)selectCrop(c.id);} $('cube-direction').textContent=face.toUpperCase();}
-function syncFields(){const c=active();$('mm-pixel').value=c?.mm||'';$('origin-x').value=c?.origin[0]??'';$('origin-y').value=c?.origin[1]??'';$('selected-face').textContent=c?.face||'—';$('source-info').textContent=c&&!full?`Source: (${c.rect.x}, ${c.rect.y}) · ${c.rect.w} × ${c.rect.h}px · page ${c.page}`:`${source.width} × ${source.height}px · page ${page}`;$('calibration-info').textContent=c?.mm?`Scale ${c.mm.toFixed(5)} mm / pixel. Origin and trace use the transformed crop; source rectangle stays unchanged.`:'Use Scale · 2 points on a known dimension, or enter mm / pixel.';}
-for(const id of ['mm-pixel','origin-x','origin-y'])$(id).oninput=()=>{const c=active();if(!c)return;const value=Number($(id).value);if(!Number.isFinite(value)||(id==='mm-pixel'&&value<=0)){status('Enter a valid positive scale.');return;}if(id==='mm-pixel')c.mm=value;else c.origin[id==='origin-x'?0:1]=value;invalidate();syncFields();alignment();};
-$('reference-mm').onchange=()=>{const c=active(),v=Number($('reference-mm').value);if(c?.calibration&&v>0){const[a,b]=c.calibration.points;c.mm=v/Math.hypot(a[0]-b[0],a[1]-b[1]);c.calibration.length=v;invalidate();syncFields();alignment();}};
-function alignment(){const report=[];for(const f of ['Front','Top','Right']){const c=crops.find(c=>c.face===f);report.push(`${c?.mm?'✓':'○'} ${f}: ${c?c.mm?'calibrated':'needs scale':'not assigned'}`);}if(profileClosed&&profile.length){const xs=profile.map(p=>p[0]),ys=profile.map(p=>p[1]);report.push(`Sketch X ${(Math.max(...xs)-Math.min(...xs)).toFixed(2)} × Y ${(Math.max(...ys)-Math.min(...ys)).toFixed(2)} mm · Z ${$('model-height').value} mm`);}for(const c of crops)if(c.extents)report.push(`${c.face}: ${Object.entries(c.extents).map(([a,v])=>a+' = '+v.toFixed(2)+' mm').join(' · ')}`);report.push('Calibrate all views to the same unit; set matching origins. Crop borders are not part boundaries.');$('alignment-report').textContent=report.join('\n');list();}
-$('projection').onchange=()=>{$('projection-layout').textContent=$('projection').value==='third'?'Third angle: Top above Front · Right to the right.':'First angle: Top below Front · Right to the left.';invalidate();};$('projection').onchange();
-$('unassign').onclick=()=>{if(active()){active().face=null;invalidate();list();syncFields();alignment();}};
-function transformCrop(flip){const c=active();if(!c)return;if(profile.length&&c.face==='Top'){remember();profile=[];circleProfile=null;profileClosed=false;}const old=c.canvas,n=canvas(flip?old.width:old.height,flip?old.height:old.width),g=n.getContext('2d');if(flip){g.translate(old.width,0);g.scale(-1,1);c.origin=[old.width-c.origin[0],c.origin[1]];c.flipped=!c.flipped;}else{g.translate(old.height,0);g.rotate(Math.PI/2);c.origin=[old.height-c.origin[1],c.origin[0]];c.rotation=(c.rotation+90)%360;}g.drawImage(old,0,0);c.canvas=n;c.analysis=null;c.calibration=null;invalidate();list();syncFields();fit();}
-$('rotate-crop').onclick=()=>transformCrop(false);$('flip-crop').onclick=()=>transformCrop(true);$('fit-source').onclick=fit;$('show-sheet').onclick=()=>{full=true;setTool('pan');fit();syncFields();};$('overlay').onchange=draw;$('overlay-opacity').oninput=draw;$('wireframe').onchange=e=>{const edge=viewer.group.getObjectByName('edges');if(edge)edge.visible=e.target.checked;};$('home-view').onclick=()=>{viewer.snap([1,-1,1]);$('cube-direction').textContent='ISOMETRIC';};
-async function loadDrawing(file){if(!file)return;if(file.size>50*1024*1024){status('Maximum file size is 50 MB.');return;}try{clear();sourceName=file.name;$('drawing-name').textContent=sourceName;if(/\.pdf$/i.test(file.name)){pdf=await pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;$('cad-page').replaceChildren(...Array.from({length:pdf.numPages},(_,i)=>new Option(i+1,i+1)));await renderPage();}else{const bitmap=await createImageBitmap(file);if(bitmap.width*bitmap.height>30000000){bitmap.close();throw Error('Image exceeds 30 megapixels.');}source.width=bitmap.width;source.height=bitmap.height;source.getContext('2d').drawImage(bitmap,0,0);bitmap.close();ready();}}catch(e){status('Could not open drawing: '+e.message);}}
-async function renderPage(){page=Number($('cad-page').value);const p=await pdf.getPage(page),base=p.getViewport({scale:1}),v=p.getViewport({scale:Math.min(3,3500/Math.max(base.width,base.height))});source.width=Math.ceil(v.width);source.height=Math.ceil(v.height);await p.render({canvasContext:source.getContext('2d'),viewport:v}).promise;full=true;ready();}
-function ready(){updateTree();$('drawing-tools').open=true;$('source-empty').hidden=true;fit();syncFields();status('Drawing ready. Crop each orthographic view at original rendered resolution.');}
-$('cad-file').onchange=e=>loadDrawing(e.target.files[0]);$('cad-page').onchange=()=>renderPage().catch(e=>status(e.message));$('from-ocr').onclick=()=>parent.postMessage({type:'request-drawing'},location.origin);window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==parent)return;if(e.data?.type==='source-drawing'){clear();const b=e.data.bitmap;source.width=b.width;source.height=b.height;source.getContext('2d').drawImage(b,0,0);b.close();page=Number(e.data.page);sourceName=e.data.name;$('drawing-name').textContent=sourceName;ready();}if(e.data?.type==='drawing-error')status(e.data.message);});
-function clear(){lastAIProposal=null;aiProposalMode=false;document.dispatchEvent(new Event('cad-session-cleared'));$('model-height').value=20;$('edge-treatment').value='none';$('edge-size').value=.5;sourceName='';standalone=false;circleProfile=null;undoStack=[];redoStack=[];worker?.terminate();worker=null;for(const p of requests.values())p.reject(Error('Session cleared'));requests.clear();pdf?.destroy();pdf=null;source.width=0;source.height=0;crops=[];selected=null;profile=[];profileClosed=false;holes=[];pockets=[];mesh=null;viewer.group.children.forEach(o=>{o.geometry.dispose();o.material.dispose();});viewer.group.clear();$('model-empty').hidden=false;$('analysis').textContent='Geometry candidates require review.';$('ocr-candidates').replaceChildren();$('source-empty').hidden=false;full=true;points=[];invalidate();list();featureList();draw();} $('reset').onclick=()=>{clear();status('Drawing, crops and solid removed from this session.');};
-$('finish-profile').onclick=()=>{remember();if(profile.length<3){status('Trace at least three vertices in a calibrated Top view.');return;}profileClosed=true;invalidate();$('analysis').textContent=`Closed sketch: ${profile.length} vertices. Review corners, heights and holes against all views.`;alignment();};$('clear-profile').onclick=()=>{remember();circleProfile=null;profile=[];profileClosed=false;invalidate();};
-$('analyze').onclick=()=>{const c=active();if(!c)return status('Select a crop first.');status('Analyzing dark contours and circle candidates…');setTimeout(()=>{try{c.analysis=analyzeCrop(c.canvas);const a=c.analysis;$('analysis').replaceChildren();const p=document.createElement('p');p.textContent=`${a.outlines.length} closed outline candidates · ${a.circles.length} circle candidates · ${a.lines.length} straight strokes. Center, dashed and annotation strokes may be mixed; review visually. Arcs are retained as contour vertices in this first prismatic workflow.`;$('analysis').append(p);a.outlines.forEach((o,i)=>{const b=document.createElement('button');b.textContent=`Use outline ${i+1} (${o.points.length} vertices)`;b.onclick=()=>{if(c.face!=='Top'||!c.mm)return status('Assign and calibrate Top first.');profile=o.points.map(p=>toModel(c,p));profileClosed=true;invalidate();alignment();draw();status('Outline proposed. Check it on the crop before confirming.');};$('analysis').append(b);});for(const circle of a.circles){const b=document.createElement('button');b.textContent=`Add circle Ø${c.mm?(circle.r*2*c.mm).toFixed(2):'?'} as through-hole`;b.onclick=()=>{if(!c.mm||!c.face)return status('Calibrate and assign the crop first.');const q=toModel(c,[circle.cx,circle.cy]),axes=viewAxes(c.face),h={x:0,y:0,z:0,radius:circle.r*c.mm,axis:({Top:'Z',Bottom:'Z',Front:'Y',Back:'Y',Right:'X',Left:'X'})[c.face]};h[axes[0].toLowerCase()]=q[0];h[axes[1].toLowerCase()]=q[1];holes.push(h);featureList();invalidate();};$('analysis').append(b);}draw();status('Candidates ready. Select only geometry that belongs to the part.');}catch(e){status('Analysis failed: '+e.message);}},30);};
-$('ocr-dimensions').onclick=async()=>{const c=active();if(!c||ocrBusy)return;ocrBusy=true;$('ocr-dimensions').disabled=true;try{const result=await ocr.extract(c.canvas,.3);$('ocr-candidates').replaceChildren();for(const r of result){const label=document.createElement('label'),check=document.createElement('input'),input=document.createElement('input'),apply=document.createElement('button');check.type='checkbox';check.setAttribute('aria-label','Confirm OCR '+r.nominal);input.value=r.nominal;input.type='text';apply.textContent='Use as height Z';apply.onclick=()=>{if(!check.checked)return status('Confirm or correct this OCR value first.');const n=Number(input.value.replace(/[^0-9.+-]/g,''));if(!(n>0))return status('A height must be a positive number.');$('model-height').value=n;invalidate();alignment();};label.append(check,input,document.createTextNode([r.upper,r.lower].filter(Boolean).join(' / ')),apply);$('ocr-candidates').append(label);}status(`${result.length} dimension candidates. Confirm each before applying.`);}catch(e){status('OCR: '+e.message);}finally{ocrBusy=false;$('ocr-dimensions').disabled=false;}};
-function numberPrompt(label,def){const s=prompt(label,String(def));if(s===null)return null;const v=Number(s);return Number.isFinite(v)?v:null;}
-$('add-hole').onclick=()=>{const axis=prompt('Through-hole axis: X, Y or Z','Z')?.toUpperCase();if(!['X','Y','Z'].includes(axis))return;const diameter=numberPrompt('Diameter (mm)',8),x=numberPrompt('Center X (mm)',20),y=numberPrompt('Center Y (mm)',15),z=numberPrompt('Center Z (mm)',10);if([diameter,x,y,z].some(n=>n===null)||diameter<=0)return;holes.push({axis,x,y,z,radius:diameter/2});featureList();invalidate();};$('add-pocket').onclick=()=>{const origin=prompt('Pocket lower corner X,Y,Z (mm)','5,5,15')?.split(',').map(Number),size=prompt('Pocket size X,Y,Z (mm)','10,10,5')?.split(',').map(Number);if(origin?.length!==3||size?.length!==3||[...origin,...size].some(n=>!Number.isFinite(n))||size.some(n=>n<=0))return status('Enter three comma-separated numbers; sizes must be positive.');pockets.push({origin,size});featureList();invalidate();};
-function featureList(){const host=$('features');host.replaceChildren();for(const [kind,arr]of [['Hole',holes],['Pocket',pockets]])arr.forEach((f,i)=>{const row=document.createElement('div');row.className='feature-row';const text=document.createElement('span');text.textContent=kind==='Hole'?`${kind} ${i+1} · Ø${(f.radius*2).toFixed(2)} · ${f.axis} · (${f.x.toFixed(2)}, ${f.y.toFixed(2)}, ${f.z.toFixed(2)})`:`Pocket ${i+1} · ${f.size.join(' × ')} mm @ ${f.origin.join(', ')}`;const del=document.createElement('button');del.textContent='Remove';del.onclick=()=>{arr.splice(i,1);featureList();invalidate();};row.append(text,del);host.append(row);});}
-for(const id of ['model-height','edge-treatment','edge-size'])$(id).onchange=()=>{invalidate();alignment();};
-function spec(){return{profile,...(circleProfile?{circle:circleProfile}:{}),depth:Number($('model-height').value),holes,pockets,...($('edge-treatment').value==='none'?{}:{[$('edge-treatment').value]:Number($('edge-size').value)})};}
-function request(type,data={}){if(!worker){worker=new Worker(new URL('./cad-worker.js',import.meta.url),{type:'module'});worker.onmessage=({data})=>{if(data.type==='status'){$('kernel-status').textContent=data.message||data.text;return;}const p=requests.get(data.id);if(!p)return;requests.delete(data.id);if(data.type==='error')p.reject(Error(data.message||data.error));else p.resolve(data);};worker.onerror=e=>{for(const p of requests.values())p.reject(Error(e.message));requests.clear();worker.terminate();worker=null;};}const id=++sequence;return new Promise((resolve,reject)=>{requests.set(id,{resolve,reject});worker.postMessage({id,type,...data});});}
-$('build-solid').onclick=async()=>{if(kernelBusy)return;if(!standalone&&!aiProposalMode&&!['Front','Top','Right'].every(f=>crops.some(c=>c.face===f&&c.mm>0)))return status('Assign and calibrate Front, Top and Right before building.');if(!profileClosed||profile.length<3)return status('Close a Top profile before building.');const xs=profile.map(p=>p[0]),ys=profile.map(p=>p[1]),spans={X:Math.max(...xs)-Math.min(...xs),Y:Math.max(...ys)-Math.min(...ys),Z:Number($('model-height').value)};const missing=['Front','Right'].filter(f=>!crops.find(c=>c.face===f)?.extents?.Z);if(!standalone&&!aiProposalMode&&missing.length)return status('Use Constrain extent to measure height Z in '+missing.join(' and ')+'.');for(const c of (standalone||aiProposalMode?[]:crops))for(const [axis,value]of Object.entries(c.extents||{}))if(Math.abs(spans[axis]-value)>Math.max(.2,value*.01))return status(`${c.face} ${axis} extent ${value.toFixed(2)} mm conflicts with the solid ${spans[axis].toFixed(2)} mm. Resolve alignment or geometry first.`);if(!$('confirm-geometry').checked)return status('Confirm the outline, height and features first.');kernelBusy=true;$('build-solid').disabled=true;status('Building and validating a solid locally…');try{const result=await request('build',{spec:spec()});mesh=result.mesh;switchView('model');viewer.show(mesh);built=true;updateTree();document.querySelectorAll('[data-export],#export-source,#export-macro').forEach(b=>b.disabled=false);const m=result.metrics;$('model-metrics').textContent=`✓ ${m.solidCount} valid solid · ${m.volume.toFixed(3)} mm³\nSurface ${m.area.toFixed(2)} mm² · ${mesh.triangles.length/3} triangles\nCheck Front / Top / Right overlays before export.`;$('kernel-status').textContent='OpenCascade · local WASM';$('overlay').checked=true;draw();status('Solid built. Check its projected edges against each source view.');}catch(e){status('Build failed: '+e.message);$('model-metrics').textContent=e.message;built=false;}finally{kernelBusy=false;$('build-solid').disabled=false;}};
-function download(blob,name){const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);}
-document.querySelectorAll('[data-export]').forEach(b=>b.onclick=async()=>{if(!built)return;try{const r=await request('export',{format:b.dataset.export});download(r.blob,`drawing-solid.${b.dataset.export}`);const format=b.dataset.export.toUpperCase();if($('clear-after-export').checked){clear();status(format+' downloaded. Drawing, crops and solid cleared.');}else status(format+' downloaded. Working data remains only in temporary browser memory.');}catch(e){status('Export failed: '+e.message);}});
-$('export-source').onclick=()=>{if(!built)return;const data={version:1,units:'mm',projection:$('projection').value,standalone,ai:lastAIProposal,spec:spec(),views:crops.map(({canvas,analysis,...c})=>c),source:sourceName};download(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),'drawing-model.json');if($('clear-after-export').checked){clear();status('Model source downloaded. Session cleared.');}};
-$('export-macro').onclick=()=>{if(!built)return;download(new Blob([freecadMacro(spec())],{type:'text/x-python'}),'drawing-model.FCMacro');if($('clear-after-export').checked){clear();status('FreeCAD macro downloaded. Session cleared.');}};
-function freecadMacro(s){return `# Generated from confirmed Drawing to Solid parameters. Run in FreeCAD.\nimport FreeCAD as App, Part, Sketcher, math\nfrom FreeCAD import Vector\nimport json\nspec=json.loads(${JSON.stringify(JSON.stringify(s))})\ndoc=App.newDocument('DrawingSolid')\nbody=doc.addObject('PartDesign::Body','Body')\nsketch=doc.addObject('Sketcher::SketchObject','Profile');body.addObject(sketch)\np=spec['profile']\nif spec.get('circle'):\n c=spec['circle'];sketch.addGeometry(Part.Circle(Vector(c['center'][0],c['center'][1],0),Vector(0,0,1),c['radius']),False)\nelse:\n for i,a in enumerate(p):\n  b=p[(i+1)%len(p)];sketch.addGeometry(Part.LineSegment(Vector(a[0],a[1],0),Vector(b[0],b[1],0)),False)\npad=body.newObject('PartDesign::Pad','Pad');pad.Profile=sketch;pad.Length=spec['depth'];doc.recompute();sketch.Visibility=False\nshape=pad.Shape\nfor i,h in enumerate(spec['holes']):\n axis={'X':Vector(1,0,0),'Y':Vector(0,1,0),'Z':Vector(0,0,1)}[h['axis']]\n origin=Vector(h['x'],h['y'],h['z']);bbox=shape.BoundBox\n length=max(bbox.XLength,bbox.YLength,bbox.ZLength)*3+10\n cutter=Part.makeCylinder(h['radius'],length,origin-axis*length/2,axis)\n shape=shape.cut(cutter)\n f=body.newObject('PartDesign::Feature','Hole'+str(i+1));f.Shape=shape\nfor i,p in enumerate(spec['pockets']):\n shape=shape.cut(Part.makeBox(*p['size'],Vector(*p['origin'])))\n f=body.newObject('PartDesign::Feature','Pocket'+str(i+1));f.Shape=shape\nif spec.get('fillet',0)>0: shape=shape.makeFillet(spec['fillet'],shape.Edges)\nif spec.get('chamfer',0)>0: shape=shape.makeChamfer(spec['chamfer'],shape.Edges)\nfinal=body.newObject('PartDesign::Feature','FinishedSolid');final.Shape=shape\nfor obj in body.Group:\n if hasattr(obj,'ViewObject'): obj.ViewObject.Visibility=False\nfinal.Visibility=True;doc.recompute()\nif App.GuiUp:\n import FreeCADGui as Gui\n Gui.activeDocument().activeView().viewAxonometric();Gui.activeDocument().activeView().fitAll()\n# Save through FreeCAD File > Save As to create FCStd.\n`;}
-function demo(){clear();sourceName='Worked example · stepped plate with Ø8 hole';$('drawing-name').textContent=sourceName;source.width=1250;source.height=820;const g=source.getContext('2d');g.fillStyle='white';g.fillRect(0,0,1250,820);g.strokeStyle='#283b51';g.lineWidth=2;g.font='18px sans-serif';const outline=[[0,0],[60,0],[60,25],[35,25],[35,40],[0,40]],mm=.1;const defs=[{face:'Front',rect:{x:50,y:60,w:650,h:250},origin:[25,225]},{face:'Top',rect:{x:50,y:370,w:650,h:430},origin:[25,410]},{face:'Right',rect:{x:760,y:60,w:450,h:250},origin:[25,225]}];for(const d of defs){g.fillText(d.face,d.rect.x,d.rect.y-15);g.save();g.translate(d.rect.x+d.origin[0],d.rect.y+d.origin[1]);g.scale(1/mm,-1/mm);g.lineWidth=mm*2;if(d.face==='Top'){g.beginPath();outline.forEach((p,i)=>i?g.lineTo(...p):g.moveTo(...p));g.closePath();g.stroke();g.beginPath();g.arc(18,18,4,0,Math.PI*2);g.stroke();g.setLineDash([.8,.5]);g.beginPath();g.moveTo(12,18);g.lineTo(24,18);g.moveTo(18,12);g.lineTo(18,24);g.stroke();}else{g.strokeRect(0,0,d.face==='Front'?60:40,20);g.setLineDash([.7,.5]);g.beginPath();if(d.face==='Front'){g.moveTo(14,0);g.lineTo(14,20);g.moveTo(22,0);g.lineTo(22,20);g.moveTo(35,0);g.lineTo(35,20);}else{g.moveTo(14,0);g.lineTo(14,20);g.moveTo(22,0);g.lineTo(22,20);g.moveTo(25,0);g.lineTo(25,20);}g.stroke();}g.restore();const c=canvas(d.rect.w,d.rect.h);c.getContext('2d').drawImage(source,d.rect.x,d.rect.y,d.rect.w,d.rect.h,0,0,d.rect.w,d.rect.h);crops.push({...d,id:++cropSequence,page:1,canvas:c,mm,rotation:0,flipped:false,extents:d.face==='Top'?{X:60,Y:40}:d.face==='Front'?{X:60,Z:20}:{Y:40,Z:20}});}profile=outline;profileClosed=true;holes=[{axis:'Z',x:18,y:18,z:0,radius:4}];$('model-height').value=20;featureList();ready();selectCrop(crops.find(c=>c.face==='Top').id);alignment();$('analysis').textContent='Worked example: confirmed Top sketch (6 vertices), Front / Right height 20 mm, one Ø8 through-hole. Review and tick the confirmation before Build solid.';status('Example loaded: three calibrated views, a stepped outline and a through-hole. Review, confirm, then build.');}
-$('demo').onclick=demo;$('empty-demo')?.addEventListener('click',demo);document.querySelectorAll('[data-step]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-step]').forEach(x=>x.classList.toggle('active',x===b));if(b.dataset.step==='geometry')$('analysis').scrollIntoView({block:'nearest',behavior:'smooth'});if(b.dataset.step==='model')$('model-viewport').scrollIntoView({block:'nearest',behavior:'smooth'});});window.addEventListener('pagehide',()=>{worker?.terminate();ocr.dispose();});
 
-$('model-json').onchange=async e=>{try{const file=e.target.files[0];if(!file||file.size>2e6)throw Error('Choose a model JSON below 2 MB.');const data=JSON.parse(await file.text()),s=data.spec;if(!Array.isArray(s?.profile)||s.profile.length<3||s.profile.length>256||!s.profile.every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite)))throw Error('Invalid profile.');if(!(Number.isFinite(s.depth)&&s.depth>0)||!Array.isArray(s.holes)||!Array.isArray(s.pockets)||s.holes.length>64||s.pockets.length>64||!s.holes.every(h=>['X','Y','Z'].includes(h.axis)&&['x','y','z','radius'].every(k=>Number.isFinite(h[k]))&&h.radius>0)||!s.pockets.every(p=>[p.origin,p.size].every(a=>Array.isArray(a)&&a.length===3&&a.every(Number.isFinite))&&p.size.every(n=>n>0)))throw Error('Invalid feature parameters.');if(s.circle&&(!(s.circle.radius>0)||!Array.isArray(s.circle.center)||s.circle.center.length!==2||!s.circle.center.every(Number.isFinite)))throw Error('Invalid circle.');if(data.standalone)newSketch();profile=s.profile;circleProfile=s.circle||null;profileClosed=true;holes=s.holes;pockets=Array.isArray(s.pockets)?s.pockets:[];$('model-height').value=s.depth;$('edge-treatment').value=s.fillet?'fillet':s.chamfer?'chamfer':'none';$('edge-size').value=s.fillet||s.chamfer||.5;featureList();invalidate();alignment();status(standalone?'Model loaded. Pad / Recompute to rebuild the solid.':'Model parameters loaded. Reopen and map source views to verify before rebuilding.');}catch(e){status(e.message);}};
+pdfjs.GlobalWorkerOptions.workerSrc = new URL('./vendor/pdf.worker.mjs', import.meta.url).href;
 
-function switchView(mode){const stage=document.querySelector('.cad-stage');stage.dataset.mode=mode;$('view-sketch').classList.toggle('active',mode==='sketch');$('view-solid').classList.toggle('active',mode==='model');$('workbench').value=mode;$('edit-state').textContent=mode==='sketch'?'Drawing views':'Model view';requestAnimationFrame(()=>{viewer.resize();draw();});}
-function drawSketchGrid(c){const cr=active();if(!cr)return;const step=10/cr.mm;ctx.lineWidth=.5/zoom;ctx.strokeStyle='#e7e7e7';ctx.beginPath();for(let x=cr.origin[0]%step;x<c.width;x+=step){ctx.moveTo(x,0);ctx.lineTo(x,c.height);}for(let y=cr.origin[1]%step;y<c.height;y+=step){ctx.moveTo(0,y);ctx.lineTo(c.width,y);}ctx.stroke();ctx.lineWidth=1/zoom;ctx.strokeStyle='#dd3333';ctx.beginPath();ctx.moveTo(0,cr.origin[1]);ctx.lineTo(c.width,cr.origin[1]);ctx.stroke();ctx.strokeStyle='#33b947';ctx.beginPath();ctx.moveTo(cr.origin[0],0);ctx.lineTo(cr.origin[0],c.height);ctx.stroke();}
-function updateTree(){for(const id of ['ai-rotate','ai-flip'])if($(id))$(id).disabled=!active();for(const id of ['ai-pan','ai-crop','ai-full'])if($(id))$(id).disabled=!source.width;if(document.querySelector('[aria-label="Isometric view"]'))document.querySelector('[aria-label="Isometric view"]').disabled=!mesh;if(!built&&!mesh&&!profile.length){if(document.querySelector('.document-title'))document.querySelector('.document-title').textContent=sourceName||'Drawing';const host=$('model-tree');if(host){host.replaceChildren();const title=document.createElement('div');title.className='tree-node';title.textContent=sourceName||'Drawing';host.append(title);for(const c of crops){const row=document.createElement('div');row.className='tree-node child';row.textContent=(c.face||'Auto')+' · Crop '+c.id;row.tabIndex=0;row.onclick=()=>selectCrop(c.id);host.append(row);}}const props=$('property-grid');if(props){props.replaceChildren();for(const [k,v]of [['Crops',crops.length],['Source',source.width?source.width+' × '+source.height+' px':'No drawing'],['Storage','Session only']]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;props.append(dt,dd);}}return;}if($('sketch-width')){const xs=profile.map(p=>p[0]),ys=profile.map(p=>p[1]);$('sketch-width').value=profile.length?(Math.max(...xs)-Math.min(...xs)).toFixed(3):'';$('sketch-height').value=profile.length?(Math.max(...ys)-Math.min(...ys)).toFixed(3):'';$('sketch-diameter').value=circleProfile?(circleProfile.radius*2).toFixed(3):'';$('sketch-diameter').disabled=!circleProfile;$('sketch-width').disabled=!!circleProfile;$('sketch-height').disabled=!!circleProfile;}const host=$('model-tree');if(!host)return;host.replaceChildren();const rows=[['Document','folder',0,'Unnamed',()=>{}],['Body','cube',1,'',()=>switchView(built?'model':'sketch')],['Origin','axis-x',2,'XY',()=>switchView('sketch')],['Sketch','pencil',2,profileClosed?'Closed':profile.length?profile.length+' points':'Empty',()=>switchView('sketch')]];if(mesh)rows.push(['Pad','extrude',2,$('model-height').value+' mm',()=>switchView('model')]);holes.forEach((h,i)=>rows.push(['Hole '+(i+1),'circle-dot',2,'Ø'+(h.radius*2).toFixed(2),()=>switchView('model')]));pockets.forEach((p,i)=>rows.push(['Pocket '+(i+1),'box-align-bottom',2,p.size.join('×'),()=>switchView('model')]));if($('edge-treatment').value!=='none')rows.push([$('edge-treatment').value,'border-radius',2,$('edge-size').value+' mm',()=>switchView('model')]);for(const [name,icon,level,value,action]of rows){const row=document.createElement('div');row.className='tree-node'+(level?' child':'')+(level===2?' feature':'')+(name==='Body'?' active':'');row.setAttribute('role','treeitem');row.tabIndex=0;const img=document.createElement('img');img.src='vendor/cad/icons/'+icon+'.svg';const text=document.createElement('span');text.textContent=name;const val=document.createElement('small');val.textContent=value;row.append(img,text,val);row.onclick=()=>{action();host.querySelectorAll('.tree-node').forEach(r=>r.classList.toggle('active',r===row));};host.append(row);}const props=$('property-grid');props.replaceChildren();for(const [k,v]of [['Plane','XY'],['Geometry',circleProfile?'Circle':profile.length+' vertices'],['Closed',profileClosed?'Yes':'No'],['Pad length',$('model-height').value+' mm'],['Holes',holes.length],['Pockets',pockets.length],['State',built?'Valid solid':'Editing']]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;props.append(dt,dd);}document.querySelector('.document-title').textContent=sourceName||'Unnamed';document.querySelector('.document-tabs>span').textContent=(sourceName||'Unnamed')+' : 1';$('sketch-hint').textContent=standalone?'XY plane · grid 10 mm · drag to pan, wheel to zoom':'Drawing reference · original pixels';}
-function remember(){if(restoring)return;undoStack.push({profile:profile.map(p=>[...p]),circle:circleProfile?structuredClone(circleProfile):null,closed:profileClosed,holes:structuredClone(holes),pockets:structuredClone(pockets),depth:$('model-height').value,edge:$('edge-treatment').value,size:$('edge-size').value});if(undoStack.length>60)undoStack.shift();redoStack=[];}
-function restore(item){restoring=true;profile=item.profile;circleProfile=item.circle;profileClosed=item.closed;holes=item.holes;pockets=item.pockets;$('model-height').value=item.depth;$('edge-treatment').value=item.edge;$('edge-size').value=item.size;invalidate();featureList();switchView('sketch');restoring=false;status('Geometry restored. Recompute the solid when ready.');}
-function historyState(){return{profile:structuredClone(profile),circle:circleProfile?structuredClone(circleProfile):null,closed:profileClosed,holes:structuredClone(holes),pockets:structuredClone(pockets),depth:$('model-height').value,edge:$('edge-treatment').value,size:$('edge-size').value};}
-function newSketch(){clear();standalone=true;sourceName='Unnamed';source.width=1600;source.height=1200;source.getContext('2d').fillStyle='#fafafa';source.getContext('2d').fillRect(0,0,1600,1200);const c=canvas(1600,1200);c.getContext('2d').drawImage(source,0,0);const cr={id:++cropSequence,canvas:c,rect:{x:0,y:0,w:1600,h:1200},page:1,face:'Top',mm:.1,origin:[800,600],rotation:0,flipped:false};crops=[cr];selected=cr.id;full=false;$('source-empty').hidden=true;selectCrop(cr.id);switchView('sketch');setTool('profile');$('confirm-geometry').checked=true;$('task-context').innerHTML='<strong>Sketch edit · XY plane</strong><p>Draw a closed polyline, a rectangle or a circle. Then choose Pad and enter its length.</p>';document.querySelector('.tasks-dock').scrollTop=0;status('New XY sketch. Choose Rectangle, Circle or Line. Grid spacing is 10 mm.');updateTree();}
-document.addEventListener('cad-command',e=>{const cmd=e.detail;if(cmd==='undo'){if(undoStack.length){redoStack.push(historyState());restore(undoStack.pop());}return;}if(cmd==='redo'){if(redoStack.length){undoStack.push(historyState());restore(redoStack.pop());}return;}if(cmd==='close-task'){document.querySelector('.cad-docks').classList.remove('show-tasks');if(!profileClosed&&profile.length>=3)$('finish-profile').click();return;}if(cmd==='new-sketch')return newSketch();if(cmd==='open')return $('cad-file').click();if(cmd==='reset')return $('reset').click();if(cmd==='sketch-view'||cmd==='model-view')return switchView(cmd==='model-view'?'model':'sketch');if(cmd==='fit'){if(document.querySelector('.cad-stage').dataset.mode==='model'){viewer.controls.reset();viewer.resize();}else fit();return;}if(cmd==='iso')return $('home-view').click();if(['line','rectangle','circle'].includes(cmd)){if(!source.width)newSketch();switchView('sketch');setTool(cmd==='line'?'profile':cmd);return;}if(cmd==='finish'){$('finish-profile').click();document.querySelector('.cad-docks').classList.remove('show-tasks');status(profileClosed?'Sketch closed. Choose Pad to extrude it.':'Draw a closed profile before Pad.');return;}remember();document.querySelector('.cad-docks').classList.add('show-tasks');if(cmd==='pad'){if(!profileClosed)return status('Close a sketch first. Use Rectangle, Circle or a closed polyline.');$('task-context').innerHTML='<strong>Pad</strong><p>Set Pad length below, then Apply / Recompute.</p>';$('model-height').focus();if(standalone)$('confirm-geometry').checked=true;}if(cmd==='pocket'){if(!profileClosed)return status('Create a closed base sketch first.');switchView('sketch');setTool('pocket');$('task-context').innerHTML='<strong>Pocket</strong><p>Set Pocket depth, drag a rectangle on the Top sketch, then Apply / Recompute.</p>';}if(cmd==='hole'){if(!profileClosed)return status('Draw the outer profile first.');switchView('sketch');setTool('hole');$('task-context').innerHTML='<strong>Hole</strong><p>Click center and radius in the sketch. Then Apply / Recompute.</p>';}if(cmd==='fillet'||cmd==='chamfer'){$('edge-treatment').value=cmd;invalidate();$('task-context').innerHTML='<strong>'+cmd+'</strong><p>Set edge size, then Apply / Recompute. Applied to all eligible edges.</p>';if(standalone)$('confirm-geometry').checked=true;}});
-document.addEventListener('keydown',e=>{if(e.target.closest('input,select,textarea'))return;if((e.ctrlKey||e.metaKey)&&['z','y'].includes(e.key.toLowerCase())){e.preventDefault();document.dispatchEvent(new CustomEvent('cad-command',{detail:e.key.toLowerCase()==='y'||e.shiftKey?'redo':'undo'}));}if(e.key==='Escape'){gesture=null;points=[];setTool('pan');}});
-$('build-solid').addEventListener('click',()=>{if(standalone)$('confirm-geometry').checked=true;},true);
-document.addEventListener('pointerdown',e=>{if(e.target.closest('#add-hole,#add-pocket,.feature-row button,#clear-profile'))remember();},true);
-updateTree();
+const $ = id => document.getElementById(id);
+const status = t => $('cad-status').textContent = t;
+const source = document.createElement('canvas');
+const display = $('source-canvas');
+const ctx = display.getContext('2d');
 
+let pdf = null, page = 1, crops = [], selected = null, full = true, tool = 'polyline';
+let zoom = 1, offset = [20, 20], gesture = null, points = [], profile = [], profileClosed = false;
+let holes = [], pockets = [], built = false, mesh = null, sourceName = 'Unnamed.FCStd', cropSequence = 0;
+let worker = null, sequence = 0, requests = new Map(), kernelBusy = false, ocrBusy = false;
+let lastAIProposal = null, aiProposalMode = false, standalone = true, circleProfile = null;
+let undoStack = [], redoStack = [], restoring = false;
 
-$('apply-sketch-size').onclick=()=>{if(!profileClosed)return status('Close a sketch before setting its size.');remember();if(circleProfile){const diameter=Number($('sketch-diameter').value);if(!(diameter>0))return status('Enter a positive diameter.');circleProfile.radius=diameter/2;const[x,y]=circleProfile.center,r=circleProfile.radius;profile=[[x-r,y-r],[x+r,y-r],[x+r,y+r],[x-r,y+r]];}else{const w=Number($('sketch-width').value),h=Number($('sketch-height').value),xs=profile.map(p=>p[0]),ys=profile.map(p=>p[1]),minX=Math.min(...xs),minY=Math.min(...ys),ow=Math.max(...xs)-minX,oh=Math.max(...ys)-minY;if(!(w>0&&h>0&&ow>0&&oh>0))return status('Enter positive width and height.');profile=profile.map(([x,y])=>[minX+(x-minX)*w/ow,minY+(y-minY)*h/oh]);}invalidate();switchView('sketch');status('Sketch dimensions applied. Pad / Recompute to update the solid.');};
+const ocr = new OcrClient(status);
+const viewer = new CadViewer(face => chooseFace(face));
 
-viewer.onOrient=()=>{if(standalone){if(!built)viewer.showSketch(profile,circleProfile);switchView('model');}};
+source.width = 0;
+source.height = 0;
 
-function featureDialog(kind){const dialog=document.createElement('dialog');dialog.className='feature-dialog';const form=document.createElement('form');const title=document.createElement('h3');title.textContent=kind==='hole'?'Hole by dimensions':'Rectangular pocket';form.append(title);const defs=kind==='hole'?[['axis','Axis','Z'],['diameter','Diameter (mm)',8],['x','Center X (mm)',0],['y','Center Y (mm)',0],['z','Center Z (mm)',0]]:[['x','Origin X (mm)',0],['y','Origin Y (mm)',0],['z','Origin Z (mm)',Number($('model-height').value)-5],['w','Width X (mm)',10],['d','Depth Y (mm)',10],['h','Cut height Z (mm)',5]];for(const [key,text,value]of defs){const label=document.createElement('label');label.textContent=text;const input=key==='axis'?document.createElement('select'):document.createElement('input');input.name=key;if(key==='axis'){for(const axis of ['X','Y','Z'])input.append(new Option(axis,axis));}else{input.type='number';input.step='any';input.required=true;}input.value=value;label.append(input);form.append(label);}const buttons=document.createElement('div'),cancel=document.createElement('button'),apply=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';cancel.onclick=()=>dialog.close();apply.type='submit';apply.textContent='Add feature';buttons.append(cancel,apply);form.append(buttons);form.onsubmit=e=>{e.preventDefault();const values=Object.fromEntries(new FormData(form));const nums=Object.keys(values).filter(k=>k!=='axis');if(nums.some(k=>!Number.isFinite(Number(values[k]))))return;remember();if(kind==='hole'){if(Number(values.diameter)<=0)return;holes.push({axis:values.axis,x:Number(values.x),y:Number(values.y),z:Number(values.z),radius:Number(values.diameter)/2});}else{if(['w','d','h'].some(k=>Number(values[k])<=0))return;pockets.push({origin:['x','y','z'].map(k=>Number(values[k])),size:['w','d','h'].map(k=>Number(values[k]))});}featureList();invalidate();dialog.close();status('Feature added. Apply / Recompute to update the solid.');};dialog.append(form);document.body.append(dialog);dialog.onclose=()=>dialog.remove();dialog.showModal();}
-$('add-hole').onclick=()=>featureDialog('hole');$('add-pocket').onclick=()=>featureDialog('pocket');
+// Initialize FreeCAD Web Sketcher
+const sketcher = new FreeCadSketcher({
+  canvas: display,
+  getCrop: () => active(),
+  onProfileChange: ({ profile: p, circle, closed, dof, summary }) => {
+    profile = p;
+    circleProfile = circle;
+    profileClosed = closed;
+    invalidate();
+    updateTree();
+    updateSolverStatus(closed, dof, summary);
+  },
+  onStatus: t => status(t),
+  isStandalone: () => standalone
+});
 
-// Focused crop → Gemini → validated solid workspace.
-for(const el of document.querySelectorAll('.command-strip,.cad-menubar [data-menu]'))el.remove();
-const undoGroup=document.querySelector('[aria-label=Undo]')?.closest('.tool-group');undoGroup?.remove();
-status('Open a drawing, crop its views, then send selected crops to Gemini.');$('model-empty').textContent='Gemini model appears here.';$('reset').textContent='Clear';$('view-sketch').textContent='Drawing';document.querySelector('.local-state').textContent='Crops stay local until sent to Gemini';$('edit-state').textContent='Crop views';$('sketch-hint').textContent='Crop Top / Front / Right / Isometric · missing views can be inferred';
-$('source-empty').innerHTML='<h2>Crop the views. Let Gemini reconstruct.</h2><p>Open a drawing, crop the views or isometric image, then send selected crops with your own Gemini key.</p><button id="open-ai-drawing">Open drawing</button><button id="blank-start" hidden></button>';$('open-ai-drawing').onclick=()=>$('cad-file').click();
-const cropBar=document.createElement('div');cropBar.className='tool-group';for(const [label,id,action]of [['Pan','ai-pan',()=>{switchView('sketch');setTool('pan');}],['Crop view','ai-crop',()=>{switchView('sketch');full=true;fit();setTool('crop');}],['Full drawing','ai-full',()=>$('show-sheet').click()],['Rotate crop','ai-rotate',()=>$('rotate-crop').click()],['Flip crop','ai-flip',()=>$('flip-crop').click()],['Gemini','ai-tasks',()=>{document.querySelector('.cad-docks').classList.toggle('show-tasks');document.querySelector('.tasks-dock').scrollTop=0;}]]){const b=document.createElement('button');b.id=id;b.className='ai-toolbar-button'+(id==='ai-tasks'?' ai-start':'');b.textContent=label;b.onclick=action;cropBar.append(b);}document.querySelector('.cad-toolbar').append(cropBar);
-const panel=mountGeminiPanel({getCrops:()=>crops,setView:(id,face)=>{const c=crops.find(c=>c.id===id);if(c)c.face=face;list();syncFields();},setInclude:(id,value)=>{const c=crops.find(c=>c.id===id);if(c)c.aiInclude=value;},apply:applyGeminiProposal});
-export async function applyGeminiProposal(input){if(kernelBusy)throw Error('CAD kernel đang bận. Thử lại sau.');const result=validateProposal(input);lastAIProposal=result;remember();aiProposalMode=true;standalone=false;profile=result.spec.profile;circleProfile=result.spec.circle||null;profileClosed=true;holes=result.spec.holes;pockets=result.spec.pockets;$('model-height').value=result.spec.depth;$('edge-treatment').value=result.spec.fillet?'fillet':result.spec.chamfer?'chamfer':'none';$('edge-size').value=result.spec.fillet||result.spec.chamfer||.5;for(const a of result.view_assignments){const c=crops.find(c=>c.id===a.crop_id);if(c&&!c.face&&a.view!=='Unknown')c.face=a.view;}featureList();list();invalidate();$('confirm-geometry').checked=true;await $('build-solid').onclick();if(!built)throw Error($('cad-status').textContent);$('model-metrics').textContent=(result.assumptions.length||result.missing_views.length?'AI proposal · includes inferred geometry\n':'AI proposal\n')+$('model-metrics').textContent;status('Gemini proposal built. Review inferred features and dimensions before export.');return{built:true};}
+function active() {
+  return crops.find(c => c.id === selected);
+}
 
-mountLocalFreecad({viewer,switchView,updateTree,getSketch:()=>({profile:structuredClone(profile),circle:circleProfile?structuredClone(circleProfile):null,closed:profileClosed})});
+function updateSolverStatus(closed, dof, summary) {
+  const badge = $('solver-badge');
+  const title = $('solver-title');
+  const desc = $('solver-desc');
+  if (!badge) return;
+  if (closed) {
+    badge.className = 'solver-badge';
+    title.textContent = '✓ Fully constrained / Closed profile';
+    desc.textContent = summary || 'Sketch loop is closed and valid for PartDesign Pad (Extrude).';
+    $('confirm-geometry').checked = true;
+  } else if (profile.length > 0 || circleProfile) {
+    badge.className = 'solver-badge under-constrained';
+    title.textContent = `○ Under-constrained (${dof || 1} DoF)`;
+    desc.textContent = summary || 'Sketch outline is not closed yet. Continue drawing to close loop.';
+  } else {
+    badge.className = 'solver-badge';
+    title.textContent = 'Sketcher: Empty sketch';
+    desc.textContent = 'Choose Line, Rect, Circle, Arc or Slot to draw on the XY plane.';
+  }
+}
 
-updateTree();
+function invalidate() {
+  built = false;
+  updateTree();
+  if (mesh) {
+    $('model-empty').hidden = false;
+    $('model-empty').textContent = 'Preview is out of date · Recompute (F5)';
+  }
+  $('confirm-geometry').checked = false;
+  document.querySelectorAll('[data-export],#export-source,#export-macro').forEach(b => b.disabled = true);
+  $('model-metrics').textContent = mesh ? 'Geometry changed. Rebuild before exporting.' : '';
+  draw();
+}
+
+function canvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  return c;
+}
+
+function currentCanvas() {
+  return full ? source : active()?.canvas || source;
+}
+
+function fit() {
+  const c = currentCanvas(), r = $('source-viewport').getBoundingClientRect();
+  if (!c.width) return;
+  zoom = Math.max(.22, Math.min((r.width - 30) / c.width, (r.height - 30) / c.height));
+  offset = [(r.width - c.width * zoom) / 2, (r.height - c.height * zoom) / 2];
+  draw();
+}
+
+function draw() {
+  const r = $('source-viewport').getBoundingClientRect(), dpr = Math.min(devicePixelRatio, 2);
+  display.width = Math.max(1, r.width * dpr);
+  display.height = Math.max(1, r.height * dpr);
+  ctx.scale(dpr, dpr);
+  ctx.fillStyle = standalone ? '#21252b' : '#e9edf4';
+  ctx.fillRect(0, 0, r.width, r.height);
+
+  const c = currentCanvas();
+  if (c.width) {
+    ctx.save();
+    ctx.translate(...offset);
+    ctx.scale(zoom, zoom);
+    ctx.fillStyle = standalone ? '#1e2227' : 'white';
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(c, 0, 0);
+    if (standalone && !full) drawSketchGrid(c);
+    ctx.restore();
+  }
+
+  // Draw crops if full drawing view
+  if (full && crops.length) {
+    ctx.save();
+    ctx.translate(...offset);
+    ctx.scale(zoom, zoom);
+    ctx.lineWidth = 1.5 / zoom;
+    for (const cr of crops) {
+      if (cr.page !== page) continue;
+      ctx.strokeStyle = cr.id === selected ? '#2563eb' : '#149b87';
+      ctx.strokeRect(cr.rect.x, cr.rect.y, cr.rect.w, cr.rect.h);
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.font = `${12 / zoom}px sans-serif`;
+      ctx.fillText(cr.face || `Crop ${cr.id}`, cr.rect.x, cr.rect.y - 4 / zoom);
+    }
+    ctx.restore();
+  }
+
+  // Render FreeCAD Sketcher interactive geometry, constraints, and dimensions
+  sketcher.render(ctx, zoom, offset, active());
+
+  // Model overlay
+  if ($('overlay').checked && mesh && active()?.mm && active()?.face) {
+    drawOverlay(active());
+  }
+
+  // Draw rectangle / pocket gestures if legacy gesture active
+  if (gesture?.type === 'crop' && gesture.end) {
+    ctx.save();
+    ctx.translate(...offset);
+    ctx.scale(zoom, zoom);
+    const a = gesture.start, b = gesture.end;
+    ctx.fillStyle = '#2563eb20';
+    ctx.fillRect(a[0], a[1], b[0] - a[0], b[1] - a[1]);
+    ctx.strokeStyle = '#2563eb';
+    ctx.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]);
+    ctx.restore();
+  }
+
+  $('source-zoom').textContent = Math.round(zoom * 100) + '%';
+}
+
+function drawOverlay(cr) {
+  ctx.save();
+  ctx.globalAlpha = Number($('overlay-opacity').value);
+  ctx.strokeStyle = '#e84460';
+  ctx.lineWidth = 1.5 / zoom;
+  const e = viewer.edgePositions;
+  if (!e || !viewAxes(cr.face)) return;
+  const axis = viewAxes(cr.face), indices = axis.map(a => ({X:0,Y:1,Z:2}[a])), sign = (['Back','Left','Bottom'].includes(cr.face)) ? -1 : 1;
+  ctx.beginPath();
+  for (let i = 0; i < e.length; i += 6) {
+    const p = [e[i + indices[0]] * sign, e[i + indices[1]]];
+    const q = [e[i + 3 + indices[0]] * sign, e[i + 3 + indices[1]]];
+    ctx.moveTo(cr.origin[0] + p[0] / cr.mm, cr.origin[1] - p[1] / cr.mm);
+    ctx.lineTo(cr.origin[0] + q[0] / cr.mm, cr.origin[1] - q[1] / cr.mm);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+new ResizeObserver(() => draw()).observe($('source-viewport'));
+
+function setSketchTool(t) {
+  tool = t;
+  sketcher.setTool(t);
+  document.querySelectorAll('[data-tool-btn]').forEach(b => {
+    b.classList.toggle('active', b.dataset.toolBtn === t);
+  });
+  draw();
+}
+
+function setTool(t) {
+  tool = t;
+  points = [];
+  gesture = null;
+  document.querySelectorAll('[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+  if (!['pan', 'crop'].includes(t)) {
+    if (!active()) {
+      status('Select a crop first.');
+      tool = 'pan';
+      return;
+    }
+    full = false;
+    fit();
+  }
+  draw();
+}
+
+document.querySelectorAll('[data-tool]').forEach(b => b.onclick = () => {
+  if (b.dataset.tool === 'crop') {
+    full = true;
+    fit();
+  }
+  setTool(b.dataset.tool);
+});
+
+function point(e) {
+  const r = display.getBoundingClientRect();
+  return [(e.clientX - r.left - offset[0]) / zoom, (e.clientY - r.top - offset[1]) / zoom];
+}
+
+display.onpointerdown = e => {
+  if (e.button === 1 || tool === 'pan') {
+    gesture = { type: 'pan', x: e.clientX, y: e.clientY, offset: [...offset] };
+  } else if (tool === 'crop') {
+    gesture = { type: 'crop', start: point(e), end: point(e) };
+  } else {
+    // FreeCAD interactive sketcher
+    sketcher.handlePointerDown(e, zoom, offset, active());
+  }
+  display.setPointerCapture(e.pointerId);
+  draw();
+};
+
+display.onpointermove = e => {
+  if (gesture?.type === 'pan') {
+    offset = [gesture.offset[0] + e.clientX - gesture.x, gesture.offset[1] + e.clientY - gesture.y];
+  } else if (gesture?.type === 'crop') {
+    gesture.end = point(e);
+  } else {
+    sketcher.handlePointerMove(e, zoom, offset, active());
+  }
+  draw();
+};
+
+display.onpointerup = e => {
+  if (gesture?.type === 'crop') {
+    const a = gesture.start, b = point(e);
+    const x = Math.max(0, Math.floor(Math.min(a[0], b[0])));
+    const y = Math.max(0, Math.floor(Math.min(a[1], b[1])));
+    const w = Math.min(source.width - x, Math.ceil(Math.abs(a[0] - b[0])));
+    const h = Math.min(source.height - y, Math.ceil(Math.abs(a[1] - b[1])));
+    if (w >= 10 && h >= 10) {
+      const c = canvas(w, h);
+      c.getContext('2d').drawImage(source, x, y, w, h, 0, 0, w, h);
+      const cr = { id: ++cropSequence, canvas: c, rect: { x, y, w, h }, page, face: null, mm: null, origin: [0, h], rotation: 0, flipped: false };
+      crops.push(cr);
+      selectCrop(cr.id);
+      $('assign-mode').checked = false;
+      status('Crop added. Label it or trace directly.');
+    }
+  }
+  gesture = null;
+  draw();
+};
+
+display.onpointercancel = () => {
+  gesture = null;
+  draw();
+};
+
+display.onwheel = e => {
+  e.preventDefault();
+  const p = point(e), r = display.getBoundingClientRect();
+  zoom = Math.max(.15, Math.min(20, zoom * Math.exp(-e.deltaY * .002)));
+  offset = [e.clientX - r.left - p[0] * zoom, e.clientY - r.top - p[1] * zoom];
+  draw();
+};
+
+function selectCrop(id) {
+  switchView('sketch');
+  selected = id;
+  full = false;
+  points = [];
+  list();
+  syncFields();
+  fit();
+  $('selected-face').textContent = active()?.face || 'Unassigned';
+}
+
+function list() {
+  document.dispatchEvent(new Event('cad-crops-changed'));
+  updateTree();
+  const host = $('crop-list');
+  if (!host) return;
+  host.replaceChildren();
+  for (const c of crops) {
+    const row = document.createElement('div');
+    row.className = 'crop-card' + (c.id === selected ? ' selected' : '');
+    row.tabIndex = 0;
+    row.setAttribute('role', 'button');
+    const thumb = canvas(c.canvas.width, c.canvas.height);
+    thumb.getContext('2d').drawImage(c.canvas, 0, 0);
+    const text = document.createElement('div');
+    const title = document.createElement('strong');
+    const info = document.createElement('small');
+    title.textContent = c.face || `Crop ${c.id}`;
+    info.textContent = `P${c.page} · ${c.rect.w}×${c.rect.h}px · ${c.mm ? c.mm.toFixed(4) + ' mm/px' : 'Uncalibrated'}`;
+    text.append(title, info);
+    const del = document.createElement('button');
+    del.textContent = '×';
+    del.onclick = e => {
+      e.stopPropagation();
+      crops = crops.filter(x => x !== c);
+      if (selected === c.id) { selected = null; full = true; }
+      invalidate();
+      list();
+      alignment();
+      draw();
+    };
+    row.append(thumb, text, del);
+    row.onclick = () => selectCrop(c.id);
+    host.append(row);
+  }
+  viewer.mapped(crops.map(c => c.face).filter(Boolean));
+  for (const b of $('view-shortcuts').children) {
+    b.classList.toggle('mapped', crops.some(c => c.face === b.textContent));
+  }
+}
+
+for (const face of Object.keys(FACE_DIRECTIONS)) {
+  const b = document.createElement('button');
+  b.textContent = face;
+  b.setAttribute('aria-label', `${face} view`);
+  b.onclick = () => {
+    viewer.snap(FACE_DIRECTIONS[face]);
+    chooseFace(face);
+  };
+  $('view-shortcuts').append(b);
+}
+
+function chooseFace(face) {
+  if (standalone) {
+    switchView('model');
+    $('cube-direction').textContent = face.toUpperCase();
+    return;
+  }
+  if ($('assign-mode').checked) {
+    const c = active();
+    if (!c) return status('Select a crop to assign first.');
+    const other = crops.find(v => v.face === face && v !== c);
+    if (other) return status(`${face} already has a crop. Unassign it first.`);
+    c.face = face;
+    invalidate();
+    list();
+    syncFields();
+    $('assign-mode').checked = false;
+    alignment();
+    status(`Crop assigned to ${face}. Camera controls now change the view only.`);
+  } else {
+    const c = crops.find(c => c.face === face);
+    if (c) selectCrop(c.id);
+  }
+  $('cube-direction').textContent = face.toUpperCase();
+}
+
+function syncFields() {
+  const c = active();
+  $('mm-pixel').value = c?.mm || '';
+  $('origin-x').value = c?.origin[0] ?? '';
+  $('origin-y').value = c?.origin[1] ?? '';
+  $('selected-face').textContent = c?.face || '—';
+  $('source-info').textContent = c && !full
+    ? `Source: (${c.rect.x}, ${c.rect.y}) · ${c.rect.w} × ${c.rect.h}px · page ${c.page}`
+    : `${source.width} × ${source.height}px · page ${page}`;
+  $('calibration-info').textContent = c?.mm
+    ? `Scale ${c.mm.toFixed(5)} mm / pixel. Origin and trace use the transformed crop; source rectangle stays unchanged.`
+    : 'Use Scale · 2 points on a known dimension, or enter mm / pixel.';
+}
+
+for (const id of ['mm-pixel', 'origin-x', 'origin-y']) {
+  $(id).oninput = () => {
+    const c = active();
+    if (!c) return;
+    const value = Number($(id).value);
+    if (!Number.isFinite(value) || (id === 'mm-pixel' && value <= 0)) {
+      status('Enter a valid positive scale.');
+      return;
+    }
+    if (id === 'mm-pixel') c.mm = value;
+    else c.origin[id === 'origin-x' ? 0 : 1] = value;
+    invalidate();
+    syncFields();
+    alignment();
+  };
+}
+
+$('reference-mm').onchange = () => {
+  const c = active(), v = Number($('reference-mm').value);
+  if (c?.calibration && v > 0) {
+    const [a, b] = c.calibration.points;
+    c.mm = v / Math.hypot(a[0] - b[0], a[1] - b[1]);
+    c.calibration.length = v;
+    invalidate();
+    syncFields();
+    alignment();
+  }
+};
+
+function alignment() {
+  const report = [];
+  for (const f of ['Front', 'Top', 'Right']) {
+    const c = crops.find(c => c.face === f);
+    report.push(`${c?.mm ? '✓' : '○'} ${f}: ${c ? c.mm ? 'calibrated' : 'needs scale' : 'not assigned'}`);
+  }
+  if (profileClosed && profile.length) {
+    const xs = profile.map(p => p[0]), ys = profile.map(p => p[1]);
+    report.push(`Sketch X ${(Math.max(...xs) - Math.min(...xs)).toFixed(2)} × Y ${(Math.max(...ys) - Math.min(...ys)).toFixed(2)} mm · Z ${$('model-height').value} mm`);
+  }
+  $('alignment-report').textContent = report.join('\n');
+  list();
+}
+
+$('projection').onchange = () => {
+  $('projection-layout').textContent = $('projection').value === 'third'
+    ? 'Third angle: Top above Front · Right to the right.'
+    : 'First angle: Top below Front · Right to the left.';
+  invalidate();
+};
+$('projection').onchange();
+
+$('unassign').onclick = () => {
+  if (active()) {
+    active().face = null;
+    invalidate();
+    list();
+    syncFields();
+    alignment();
+  }
+};
+
+function transformCrop(flip) {
+  const c = active();
+  if (!c) return;
+  const old = c.canvas, n = canvas(flip ? old.width : old.height, flip ? old.height : old.width), g = n.getContext('2d');
+  if (flip) {
+    g.translate(old.width, 0);
+    g.scale(-1, 1);
+    c.origin = [old.width - c.origin[0], c.origin[1]];
+    c.flipped = !c.flipped;
+  } else {
+    g.translate(old.height, 0);
+    g.rotate(Math.PI / 2);
+    c.origin = [old.height - c.origin[1], c.origin[0]];
+    c.rotation = (c.rotation + 90) % 360;
+  }
+  g.drawImage(old, 0, 0);
+  c.canvas = n;
+  invalidate();
+  list();
+  syncFields();
+  fit();
+}
+
+$('rotate-crop').onclick = () => transformCrop(false);
+$('flip-crop').onclick = () => transformCrop(true);
+$('fit-source').onclick = fit;
+$('show-sheet').onclick = () => { full = true; setTool('pan'); fit(); syncFields(); };
+$('overlay').onchange = draw;
+$('overlay-opacity').oninput = draw;
+$('wireframe').onchange = e => {
+  const edge = viewer.group.getObjectByName('edges');
+  if (edge) edge.visible = e.target.checked;
+};
+$('home-view').onclick = () => {
+  viewer.snap([1, -1, 1]);
+  $('cube-direction').textContent = 'ISOMETRIC';
+};
+
+async function loadDrawing(file) {
+  if (!file) return;
+  if (file.size > 50 * 1024 * 1024) return status('Maximum file size is 50 MB.');
+  try {
+    clear();
+    sourceName = file.name;
+    $('drawing-name').textContent = sourceName;
+    if (/\.pdf$/i.test(file.name)) {
+      pdf = await pdfjs.getDocument({ data: new Uint8Array(await file.arrayBuffer()) }).promise;
+      $('cad-page').replaceChildren(...Array.from({ length: pdf.numPages }, (_, i) => new Option(i + 1, i + 1)));
+      await renderPage();
+    } else {
+      const bitmap = await createImageBitmap(file);
+      source.width = bitmap.width;
+      source.height = bitmap.height;
+      source.getContext('2d').drawImage(bitmap, 0, 0);
+      bitmap.close();
+      ready();
+    }
+  } catch (e) {
+    status('Could not open drawing: ' + e.message);
+  }
+}
+
+async function renderPage() {
+  page = Number($('cad-page').value);
+  const p = await pdf.getPage(page), base = p.getViewport({ scale: 1 }), v = p.getViewport({ scale: Math.min(3, 3500 / Math.max(base.width, base.height)) });
+  source.width = Math.ceil(v.width);
+  source.height = Math.ceil(v.height);
+  await p.render({ canvasContext: source.getContext('2d'), viewport: v }).promise;
+  full = true;
+  ready();
+}
+
+function ready() {
+  updateTree();
+  $('drawing-tools').open = true;
+  $('source-empty').hidden = true;
+  fit();
+  syncFields();
+  status('Drawing ready. Trace over views or crop for assisted modeling.');
+}
+
+$('cad-file').onchange = e => loadDrawing(e.target.files[0]);
+$('cad-page').onchange = () => renderPage().catch(e => status(e.message));
+$('from-ocr').onclick = () => parent.postMessage({ type: 'request-drawing' }, location.origin);
+
+function clear() {
+  lastAIProposal = null;
+  aiProposalMode = false;
+  document.dispatchEvent(new Event('cad-session-cleared'));
+  $('model-height').value = 20;
+  $('edge-treatment').value = 'none';
+  $('edge-size').value = .5;
+  sourceName = 'Unnamed.FCStd';
+  standalone = true;
+  circleProfile = null;
+  undoStack = [];
+  redoStack = [];
+  worker?.terminate();
+  worker = null;
+  for (const p of requests.values()) p.reject(Error('Session cleared'));
+  requests.clear();
+  pdf?.destroy();
+  pdf = null;
+  source.width = 0;
+  source.height = 0;
+  crops = [];
+  selected = null;
+  profile = [];
+  profileClosed = false;
+  holes = [];
+  pockets = [];
+  mesh = null;
+  sketcher.clear();
+  viewer.group.children.forEach(o => { o.geometry?.dispose(); o.material?.dispose(); });
+  viewer.group.clear();
+  $('model-empty').hidden = false;
+  $('analysis').textContent = 'Geometry candidates require review.';
+  $('ocr-candidates').replaceChildren();
+  $('source-empty').hidden = false;
+  full = true;
+  points = [];
+  invalidate();
+  list();
+  featureList();
+  draw();
+}
+
+$('reset').onclick = () => {
+  clear();
+  newSketch();
+  status('Session cleared. New FreeCAD XY sketch initialized.');
+};
+
+$('finish-profile').onclick = () => {
+  sketcher.finishCurrent();
+  if (profile.length < 3 && !circleProfile) {
+    status('Draw at least three vertices in a closed loop.');
+    return;
+  }
+  profileClosed = true;
+  invalidate();
+  alignment();
+};
+
+$('clear-profile').onclick = () => {
+  sketcher.clear();
+  profile = [];
+  circleProfile = null;
+  profileClosed = false;
+  invalidate();
+  status('Sketch cleared.');
+};
+
+function featureList() {
+  const host = $('features');
+  if (!host) return;
+  host.replaceChildren();
+  for (const [kind, arr] of [['Hole', holes], ['Pocket', pockets]]) {
+    arr.forEach((f, i) => {
+      const row = document.createElement('div');
+      row.className = 'feature-row';
+      const text = document.createElement('span');
+      text.textContent = kind === 'Hole'
+        ? `${kind} ${i + 1} · Ø${(f.radius * 2).toFixed(2)} · ${f.axis} · (${f.x.toFixed(2)}, ${f.y.toFixed(2)}, ${f.z.toFixed(2)})`
+        : `Pocket ${i + 1} · ${f.size.join(' × ')} mm @ ${f.origin.join(', ')}`;
+      const del = document.createElement('button');
+      del.textContent = 'Remove';
+      del.onclick = () => {
+        arr.splice(i, 1);
+        featureList();
+        invalidate();
+      };
+      row.append(text, del);
+      host.append(row);
+    });
+  }
+}
+
+for (const id of ['model-height', 'edge-treatment', 'edge-size']) {
+  $(id).onchange = () => { invalidate(); alignment(); };
+}
+
+function spec() {
+  return {
+    profile,
+    ...(circleProfile ? { circle: circleProfile } : {}),
+    depth: Number($('model-height').value) || 20,
+    holes,
+    pockets,
+    ...($('edge-treatment').value === 'none' ? {} : { [$('edge-treatment').value]: Number($('edge-size').value) })
+  };
+}
+
+function request(type, data = {}) {
+  if (!worker) {
+    worker = new Worker(new URL('./cad-worker.js', import.meta.url), { type: 'module' });
+    worker.onmessage = ({ data }) => {
+      if (data.type === 'status') {
+        $('kernel-status').textContent = data.message || data.text;
+        return;
+      }
+      const p = requests.get(data.id);
+      if (!p) return;
+      requests.delete(data.id);
+      if (data.type === 'error') p.reject(Error(data.message || data.error));
+      else p.resolve(data);
+    };
+    worker.onerror = e => {
+      for (const p of requests.values()) p.reject(Error(e.message));
+      requests.clear();
+      worker.terminate();
+      worker = null;
+    };
+  }
+  const id = ++sequence;
+  return new Promise((resolve, reject) => {
+    requests.set(id, { resolve, reject });
+    worker.postMessage({ id, type, ...data });
+  });
+}
+
+$('build-solid').onclick = async () => {
+  if (kernelBusy) return;
+  if (!profileClosed || profile.length < 3) {
+    return status('Close a 2D sketch loop before Pad (Extrude). Use Polyline, Rectangle, Circle, Arc or Slot.');
+  }
+  kernelBusy = true;
+  $('build-solid').disabled = true;
+  status('Computing 3D solid with local OpenCascade kernel…');
+  try {
+    const result = await request('build', { spec: spec() });
+    mesh = result.mesh;
+    switchView('model');
+    viewer.show(mesh);
+    built = true;
+    updateTree();
+    document.querySelectorAll('[data-export],#export-source,#export-macro').forEach(b => b.disabled = false);
+    const m = result.metrics;
+    $('model-metrics').textContent = `✓ Valid solid · Volume ${m.volume.toFixed(3)} mm³\nArea ${m.area.toFixed(2)} mm² · ${mesh.triangles.length / 3} triangles`;
+    $('kernel-status').textContent = 'OpenCascade · local WASM';
+    $('overlay').checked = true;
+    draw();
+    status('Solid computed successfully! Rotate with mouse in 3D viewport.');
+  } catch (e) {
+    status('Build failed: ' + e.message);
+    $('model-metrics').textContent = e.message;
+    built = false;
+  } finally {
+    kernelBusy = false;
+    $('build-solid').disabled = false;
+  }
+};
+
+async function revolveSolid() {
+  if (kernelBusy) return;
+  if (!profileClosed || profile.length < 3) return status('Close a 2D sketch loop before Revolution.');
+  kernelBusy = true;
+  status('Revolving 2D sketch around Y-axis into rotational 3D solid…');
+  try {
+    const s = spec();
+    s.revolve = true;
+    s.revolveAxis = 'Y';
+    s.revolveAngle = 360;
+    const result = await request('build', { spec: s });
+    mesh = result.mesh;
+    switchView('model');
+    viewer.show(mesh);
+    built = true;
+    updateTree();
+    document.querySelectorAll('[data-export],#export-source,#export-macro').forEach(b => b.disabled = false);
+    status('Revolution complete! 3D rotational solid created.');
+  } catch (e) {
+    status('Revolution failed: ' + e.message);
+  } finally {
+    kernelBusy = false;
+  }
+}
+
+function download(blob, name) {
+  const a = document.createElement('a'), url = URL.createObjectURL(blob);
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+}
+
+document.querySelectorAll('[data-export]').forEach(b => b.onclick = async () => {
+  if (!built) return;
+  try {
+    const r = await request('export', { format: b.dataset.export });
+    download(r.blob, `freecad-part.${b.dataset.export}`);
+    status(`${b.dataset.export.toUpperCase()} file exported.`);
+  } catch (e) {
+    status('Export failed: ' + e.message);
+  }
+});
+
+$('export-source').onclick = () => {
+  if (!built) return;
+  const data = { version: 1, units: 'mm', standalone, spec: spec(), source: sourceName };
+  download(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), 'freecad-model.json');
+  status('Model JSON downloaded.');
+};
+
+$('export-macro').onclick = () => {
+  if (!built) return;
+  download(new Blob([freecadMacro(spec())], { type: 'text/x-python' }), 'freecad-part.FCMacro');
+  status('FreeCAD Macro downloaded. Run in desktop FreeCAD to edit as a native parametric body.');
+};
+
+function freecadMacro(s) {
+  return `# Generated by FreeCAD Web Clone. Open and run in FreeCAD.
+import FreeCAD as App, Part, Sketcher, math
+from FreeCAD import Vector
+import json
+
+spec = json.loads(${JSON.stringify(JSON.stringify(s))})
+doc = App.newDocument('FreeCADWebPart')
+body = doc.addObject('PartDesign::Body', 'Body')
+sketch = doc.addObject('Sketcher::SketchObject', 'Sketch_Profile')
+body.addObject(sketch)
+
+p = spec['profile']
+if spec.get('circle'):
+    c = spec['circle']
+    sketch.addGeometry(Part.Circle(Vector(c['center'][0], c['center'][1], 0), Vector(0, 0, 1), c['radius']), False)
+else:
+    for i, a in enumerate(p):
+        b = p[(i + 1) % len(p)]
+        sketch.addGeometry(Part.LineSegment(Vector(a[0], a[1], 0), Vector(b[0], b[1], 0)), False)
+
+if spec.get('revolve'):
+    rev = body.newObject('PartDesign::Revolution', 'Revolution')
+    rev.Profile = sketch
+    rev.Angle = spec.get('revolveAngle', 360)
+    rev.ReferenceAxis = (sketch, ['Y_Axis'])
+    shape = rev.Shape
+else:
+    pad = body.newObject('PartDesign::Pad', 'Pad')
+    pad.Profile = sketch
+    pad.Length = spec['depth']
+    doc.recompute()
+    shape = pad.Shape
+
+for i, h in enumerate(spec.get('holes', [])):
+    axis = {'X': Vector(1, 0, 0), 'Y': Vector(0, 1, 0), 'Z': Vector(0, 0, 1)}[h['axis']]
+    origin = Vector(h['x'], h['y'], h['z'])
+    bbox = shape.BoundBox
+    length = max(bbox.XLength, bbox.YLength, bbox.ZLength) * 3 + 10
+    cutter = Part.makeCylinder(h['radius'], length, origin - axis * length / 2, axis)
+    shape = shape.cut(cutter)
+    f = body.newObject('PartDesign::Feature', 'Hole_' + str(i + 1))
+    f.Shape = shape
+
+for i, pk in enumerate(spec.get('pockets', [])):
+    shape = shape.cut(Part.makeBox(*pk['size'], Vector(*pk['origin'])))
+    f = body.newObject('PartDesign::Feature', 'Pocket_' + str(i + 1))
+    f.Shape = shape
+
+if spec.get('fillet', 0) > 0: shape = shape.makeFillet(spec['fillet'], shape.Edges)
+if spec.get('chamfer', 0) > 0: shape = shape.makeChamfer(spec['chamfer'], shape.Edges)
+
+final = body.newObject('PartDesign::Feature', 'FinalSolid')
+final.Shape = shape
+sketch.Visibility = False
+doc.recompute()
+
+if App.GuiUp:
+    import FreeCADGui as Gui
+    Gui.activeDocument().activeView().viewAxonometric()
+    Gui.activeDocument().activeView().fitAll()
+`;
+}
+
+function demo() {
+  clear();
+  sourceName = 'Example_Plate_Ø8.FCStd';
+  $('fc-doc-name').textContent = sourceName;
+  $('drawing-name').textContent = sourceName;
+  const outline = [[0, 0], [60, 0], [60, 25], [35, 25], [35, 40], [0, 40]];
+  profile = outline;
+  profileClosed = true;
+  holes = [{ axis: 'Z', x: 18, y: 18, z: 0, radius: 4 }];
+  $('model-height').value = 20;
+
+  // Load into sketcher so user can interactively draw/modify
+  sketcher.loadProfile(outline);
+  featureList();
+  ready();
+  switchView('sketch');
+  status('Worked example loaded into FreeCAD Sketcher. Pad or modify directly on canvas.');
+}
+
+$('demo').onclick = demo;
+$('empty-demo')?.addEventListener('click', demo);
+
+function switchView(mode) {
+  const stage = document.querySelector('.cad-stage');
+  stage.dataset.mode = mode;
+  $('view-sketch').classList.toggle('active', mode === 'sketch');
+  $('view-solid').classList.toggle('active', mode === 'model');
+  $('workbench').value = mode === 'model' ? 'model' : 'sketch';
+  $('edit-state').textContent = mode === 'sketch' ? '2D Sketcher Edit' : '3D PartDesign Solid';
+  document.querySelectorAll('.sketch-strip').forEach(el => el.classList.toggle('hidden-strip', mode === 'model'));
+  requestAnimationFrame(() => {
+    viewer.resize();
+    draw();
+  });
+}
+
+function drawSketchGrid(c) {
+  const cr = active();
+  if (!cr) return;
+  const step = 10 / cr.mm;
+  ctx.lineWidth = .5 / zoom;
+  ctx.strokeStyle = '#2b313c';
+  ctx.beginPath();
+  for (let x = cr.origin[0] % step; x < c.width; x += step) {
+    ctx.moveTo(x, 0); ctx.lineTo(x, c.height);
+  }
+  for (let y = cr.origin[1] % step; y < c.height; y += step) {
+    ctx.moveTo(0, y); ctx.lineTo(c.width, y);
+  }
+  ctx.stroke();
+}
+
+function updateTree() {
+  for (const id of ['ai-rotate', 'ai-flip']) if ($(id)) $(id).disabled = !active();
+  for (const id of ['ai-pan', 'ai-crop', 'ai-full']) if ($(id)) $(id).disabled = !source.width;
+
+  const host = $('model-tree');
+  if (!host) return;
+
+  const rows = [
+    ['Application', 'folder', 0, '', () => {}],
+    [sourceName || 'Unnamed.FCStd', 'file-plus', 1, '', () => switchView('sketch')],
+    ['Body', 'cube', 2, 'Active', () => switchView(built ? 'model' : 'sketch')],
+    ['Origin', 'axis-x', 3, 'XY_Plane', () => switchView('sketch')],
+    ['Sketch', 'pencil', 3, profileClosed ? 'Closed' : profile.length ? `${profile.length} pts` : 'Empty', () => switchView('sketch')]
+  ];
+
+  if (mesh) rows.push(['Pad', 'extrude', 3, `${$('model-height').value} mm`, () => switchView('model')]);
+  holes.forEach((h, i) => rows.push([`Hole ${i + 1}`, 'circle-dot', 3, `Ø${(h.radius * 2).toFixed(2)}`, () => switchView('model')]));
+  pockets.forEach((p, i) => rows.push([`Pocket ${i + 1}`, 'box-align-bottom', 3, p.size.join('×'), () => switchView('model')]));
+  if ($('edge-treatment').value !== 'none') {
+    rows.push([$('edge-treatment').value, 'border-radius', 3, `${$('edge-size').value} mm`, () => switchView('model')]);
+  }
+
+  host.replaceChildren();
+  for (const [name, icon, level, value, action] of rows) {
+    const row = document.createElement('div');
+    row.className = 'tree-node' + (level ? ' child' : '') + (level === 3 ? ' feature' : '') + (name === 'Body' ? ' active' : '');
+    row.setAttribute('role', 'treeitem');
+    row.tabIndex = 0;
+    const img = document.createElement('img');
+    img.src = 'vendor/cad/icons/' + icon + '.svg';
+    const text = document.createElement('span');
+    text.textContent = name;
+    const val = document.createElement('small');
+    val.textContent = value;
+    row.append(img, text, val);
+    row.onclick = () => {
+      action();
+      host.querySelectorAll('.tree-node').forEach(r => r.classList.toggle('active', r === row));
+    };
+    host.append(row);
+  }
+
+  const props = $('property-grid');
+  if (props) {
+    props.replaceChildren();
+    for (const [k, v] of [
+      ['Document', sourceName || 'Unnamed.FCStd'],
+      ['Plane', 'XY_Plane (Base)'],
+      ['Sketch Type', circleProfile ? 'Circle' : `${profile.length} Vertices`],
+      ['Status', profileClosed ? 'Fully Constrained' : 'Under-constrained'],
+      ['Pad Length', `${$('model-height').value} mm`],
+      ['Holes', holes.length],
+      ['Pockets', pockets.length],
+      ['3D State', built ? 'Valid Solid' : 'Editing']
+    ]) {
+      const dt = document.createElement('dt'), dd = document.createElement('dd');
+      dt.textContent = k; dd.textContent = v;
+      props.append(dt, dd);
+    }
+  }
+
+  $('fc-doc-name').textContent = sourceName || 'Unnamed.FCStd';
+  $('doc-tab-label').textContent = (sourceName || 'Unnamed.FCStd') + ' : 1';
+}
+
+function newSketch() {
+  clear();
+  standalone = true;
+  sourceName = 'Unnamed.FCStd';
+  source.width = 1600;
+  source.height = 1200;
+  const sCtx = source.getContext('2d');
+  sCtx.fillStyle = '#21252b';
+  sCtx.fillRect(0, 0, 1600, 1200);
+
+  const c = canvas(1600, 1200);
+  c.getContext('2d').drawImage(source, 0, 0);
+  const cr = { id: ++cropSequence, canvas: c, rect: { x: 0, y: 0, w: 1600, h: 1200 }, page: 1, face: 'Top', mm: 0.1, origin: [800, 600], rotation: 0, flipped: false };
+  crops = [cr];
+  selected = cr.id;
+  full = false;
+  $('source-empty').hidden = true;
+  selectCrop(cr.id);
+  switchView('sketch');
+  sketcher.clear();
+  setSketchTool('polyline');
+  $('confirm-geometry').checked = true;
+  updateSolverStatus(false, 0, 'New XY sketch created. Choose a tool to draw directly.');
+  status('New XY Sketch created. Draw with Polyline (L), Rectangle (R), Circle (C), Arc (A), Slot (S).');
+  updateTree();
+}
+
+function showHelpModal() {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'fc-modal-help';
+  dialog.innerHTML = `
+    <h3>📐 FreeCAD Web Shortcuts & Quick Guide</h3>
+    <table>
+      <tr><th>Shortcut</th><th>Action</th><th>Description</th></tr>
+      <tr><td><kbd>L</kbd></td><td>Polyline</td><td>Draw continuous lines, snap to start point to close</td></tr>
+      <tr><td><kbd>R</kbd></td><td>Rectangle</td><td>Draw 2-point parametric rectangle</td></tr>
+      <tr><td><kbd>C</kbd></td><td>Circle</td><td>Center point + radius point</td></tr>
+      <tr><td><kbd>A</kbd></td><td>3-Point Arc</td><td>Start point, end point, drag curvature</td></tr>
+      <tr><td><kbd>S</kbd></td><td>Slot</td><td>Elongated rounded slot between 2 centers</td></tr>
+      <tr><td><kbd>P</kbd></td><td>Polygon</td><td>Regular hexagon / polygon</td></tr>
+      <tr><td><kbd>G</kbd></td><td>Construction</td><td>Toggle dashed blue construction helper lines</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Finish / Cancel</td><td>Finish current line or return to pan</td></tr>
+      <tr><td><kbd>Space</kbd></td><td>Toggle 2D/3D</td><td>Switch between 2D Sketcher and 3D Solid View</td></tr>
+      <tr><td><kbd>F5</kbd></td><td>Recompute</td><td>Rebuild 3D solid from current sketch</td></tr>
+      <tr><td><kbd>Ctrl+Z</kbd></td><td>Undo</td><td>Undo last sketch action</td></tr>
+      <tr><td><kbd>Ctrl+Y</kbd></td><td>Redo</td><td>Redo last sketch action</td></tr>
+    </table>
+    <div style="text-align:right;margin-top:15px"><button id="fc-close-help" class="primary" style="padding:6px 14px">Close</button></div>
+  `;
+  document.body.append(dialog);
+  dialog.querySelector('#fc-close-help').onclick = () => dialog.close();
+  dialog.onclose = () => dialog.remove();
+  dialog.showModal();
+}
+
+// Global CAD Command Dispatcher
+document.addEventListener('cad-command', e => {
+  const cmd = e.detail;
+  if (cmd === 'undo') {
+    if (sketcher.undo()) return draw();
+    return;
+  }
+  if (cmd === 'redo') {
+    if (sketcher.redo()) return draw();
+    return;
+  }
+  if (cmd === 'close-task') {
+    document.querySelector('.cad-docks').classList.remove('show-tasks');
+    return;
+  }
+  if (cmd === 'new-sketch') return newSketch();
+  if (cmd === 'open') return $('cad-file').click();
+  if (cmd === 'reset') return $('reset').click();
+  if (cmd === 'sketch-view' || cmd === 'model-view') return switchView(cmd === 'model-view' ? 'model' : 'sketch');
+  if (cmd === 'fit') {
+    if (document.querySelector('.cad-stage').dataset.mode === 'model') {
+      viewer.controls.reset();
+      viewer.resize();
+    } else fit();
+    return;
+  }
+  if (cmd === 'iso') return $('home-view').click();
+  if (cmd === 'toggle-wireframe') {
+    $('wireframe').checked = !$('wireframe').checked;
+    $('wireframe').dispatchEvent(new Event('change'));
+    return;
+  }
+  if (cmd === 'clear-profile') {
+    sketcher.clear();
+    profile = [];
+    circleProfile = null;
+    profileClosed = false;
+    invalidate();
+    return;
+  }
+  if (['line', 'rectangle', 'circle', 'arc', 'slot', 'polygon'].includes(cmd)) {
+    if (!source.width) newSketch();
+    switchView('sketch');
+    const toolMap = { line: 'polyline', rectangle: 'rectangle', circle: 'circle', arc: 'arc', slot: 'slot', polygon: 'polygon' };
+    setSketchTool(toolMap[cmd] || cmd);
+    return;
+  }
+  if (cmd === 'construction') {
+    const act = sketcher.toggleConstruction();
+    $('btn-construction')?.classList.toggle('active', act);
+    status(act ? 'Construction Mode ON (blue dashed helper lines).' : 'Normal Geometry Mode ON.');
+    draw();
+    return;
+  }
+  if (cmd === 'grid-snap') {
+    const act = sketcher.toggleGridSnap();
+    $('btn-grid-snap')?.classList.toggle('active', act);
+    status(act ? 'Grid snap enabled.' : 'Grid snap disabled.');
+    draw();
+    return;
+  }
+  if (cmd === 'finish') {
+    sketcher.finishCurrent();
+    if (profileClosed) {
+      status('Sketch closed. Pad ready.');
+      document.querySelector('.cad-docks').classList.add('show-tasks');
+      $('build-solid').click();
+    } else {
+      status('Draw a closed outline before Pad.');
+    }
+    draw();
+    return;
+  }
+  if (cmd === 'pad') {
+    if (!profileClosed) return status('Close a sketch first before Pad. Use Polyline, Rectangle, Circle, Arc or Slot.');
+    switchView('model');
+    $('build-solid').click();
+    return;
+  }
+  if (cmd === 'revolve') {
+    if (!profileClosed) return status('Close a sketch first before Revolution.');
+    revolveSolid();
+    return;
+  }
+  if (cmd === 'recompute') {
+    $('build-solid').click();
+    return;
+  }
+  if (cmd === 'pocket') {
+    featureDialog('pocket');
+    return;
+  }
+  if (cmd === 'hole') {
+    featureDialog('hole');
+    return;
+  }
+  if (cmd === 'fillet' || cmd === 'chamfer') {
+    $('edge-treatment').value = cmd;
+    invalidate();
+    $('build-solid').click();
+    return;
+  }
+  if (cmd === 'help') {
+    showHelpModal();
+    return;
+  }
+  if (cmd === 'export-step') {
+    document.querySelector('[data-export="step"]')?.click();
+    return;
+  }
+  if (cmd === 'export-stl') {
+    document.querySelector('[data-export="stl"]')?.click();
+    return;
+  }
+  if (cmd === 'export-macro') {
+    $('export-macro')?.click();
+    return;
+  }
+  if (cmd === 'export-source') {
+    $('export-source')?.click();
+    return;
+  }
+});
+
+// Keyboard Shortcuts
+document.addEventListener('keydown', e => {
+  if (e.target.closest('input,select,textarea')) return;
+  const key = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && ['z', 'y'].includes(key)) {
+    e.preventDefault();
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: key === 'y' || e.shiftKey ? 'redo' : 'undo' }));
+  } else if (key === 'l') {
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: 'line' }));
+  } else if (key === 'r') {
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: 'rectangle' }));
+  } else if (key === 'c') {
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: 'circle' }));
+  } else if (key === 'a') {
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: 'arc' }));
+  } else if (key === 's') {
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: 'slot' }));
+  } else if (key === 'p' && !e.ctrlKey) {
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: 'polygon' }));
+  } else if (key === 'g') {
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: 'construction' }));
+  } else if (e.key === 'F5') {
+    e.preventDefault();
+    document.dispatchEvent(new CustomEvent('cad-command', { detail: 'recompute' }));
+  } else if (e.key === ' ') {
+    e.preventDefault();
+    const cur = document.querySelector('.cad-stage').dataset.mode;
+    switchView(cur === 'model' ? 'sketch' : 'model');
+  } else if (e.key === 'Escape') {
+    sketcher.finishCurrent();
+    setSketchTool('polyline');
+  }
+});
+
+function featureDialog(kind) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'feature-dialog';
+  const form = document.createElement('form');
+  const title = document.createElement('h3');
+  title.textContent = kind === 'hole' ? 'Parametric Hole' : 'Rectangular Pocket';
+  form.append(title);
+  const defs = kind === 'hole'
+    ? [['axis', 'Axis', 'Z'], ['diameter', 'Diameter (mm)', 8], ['x', 'Center X (mm)', 0], ['y', 'Center Y (mm)', 0], ['z', 'Center Z (mm)', 0]]
+    : [['x', 'Origin X (mm)', 0], ['y', 'Origin Y (mm)', 0], ['z', 'Origin Z (mm)', Number($('model-height').value) - 5], ['w', 'Width X (mm)', 10], ['d', 'Depth Y (mm)', 10], ['h', 'Cut height Z (mm)', 5]];
+  for (const [key, text, value] of defs) {
+    const label = document.createElement('label');
+    label.textContent = text;
+    const input = key === 'axis' ? document.createElement('select') : document.createElement('input');
+    input.name = key;
+    if (key === 'axis') {
+      for (const axis of ['X', 'Y', 'Z']) input.append(new Option(axis, axis));
+    } else {
+      input.type = 'number';
+      input.step = 'any';
+      input.required = true;
+    }
+    input.value = value;
+    label.append(input);
+    form.append(label);
+  }
+  const buttons = document.createElement('div'), cancel = document.createElement('button'), apply = document.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = 'Cancel';
+  cancel.onclick = () => dialog.close();
+  apply.type = 'submit';
+  apply.textContent = 'Apply Feature';
+  buttons.append(cancel, apply);
+  form.append(buttons);
+  form.onsubmit = e => {
+    e.preventDefault();
+    const values = Object.fromEntries(new FormData(form));
+    const nums = Object.keys(values).filter(k => k !== 'axis');
+    if (nums.some(k => !Number.isFinite(Number(values[k])))) return;
+    if (kind === 'hole') {
+      if (Number(values.diameter) <= 0) return;
+      holes.push({ axis: values.axis, x: Number(values.x), y: Number(values.y), z: Number(values.z), radius: Number(values.diameter) / 2 });
+    } else {
+      if (['w', 'd', 'h'].some(k => Number(values[k]) <= 0)) return;
+      pockets.push({ origin: ['x', 'y', 'z'].map(k => Number(values[k])), size: ['w', 'd', 'h'].map(k => Number(values[k])) });
+    }
+    featureList();
+    invalidate();
+    dialog.close();
+    status('Feature added. Pad / Recompute to update solid.');
+    $('build-solid').click();
+  };
+  dialog.append(form);
+  document.body.append(dialog);
+  dialog.onclose = () => dialog.remove();
+  dialog.showModal();
+}
+
+// Append Gemini AI and FreeCAD Local Bridge to Toolbar without removing CAD tools
+const extGroup = document.createElement('div');
+extGroup.className = 'tool-group';
+const btnGemini = document.createElement('button');
+btnGemini.className = 'ai-toolbar-button';
+btnGemini.title = 'AI Assistance with Gemini';
+btnGemini.textContent = 'Gemini AI';
+btnGemini.onclick = () => {
+  document.querySelector('.cad-docks').classList.toggle('show-tasks');
+  document.querySelector('.tasks-dock').scrollTop = 0;
+};
+extGroup.append(btnGemini);
+document.querySelector('.cad-toolbar').append(extGroup);
+
+const panel = mountGeminiPanel({
+  getCrops: () => crops,
+  setView: (id, face) => {
+    const c = crops.find(c => c.id === id);
+    if (c) c.face = face;
+    list();
+    syncFields();
+  },
+  setInclude: (id, value) => {
+    const c = crops.find(c => c.id === id);
+    if (c) c.aiInclude = value;
+  },
+  apply: applyGeminiProposal
+});
+
+export async function applyGeminiProposal(input) {
+  if (kernelBusy) throw Error('CAD kernel đang bận. Thử lại sau.');
+  const result = validateProposal(input);
+  lastAIProposal = result;
+  aiProposalMode = true;
+  standalone = false;
+  profile = result.spec.profile;
+  circleProfile = result.spec.circle || null;
+  profileClosed = true;
+  holes = result.spec.holes;
+  pockets = result.spec.pockets;
+  $('model-height').value = result.spec.depth;
+  $('edge-treatment').value = result.spec.fillet ? 'fillet' : result.spec.chamfer ? 'chamfer' : 'none';
+  $('edge-size').value = result.spec.fillet || result.spec.chamfer || .5;
+  for (const a of result.view_assignments) {
+    const c = crops.find(c => c.id === a.crop_id);
+    if (c && !c.face && a.view !== 'Unknown') c.face = a.view;
+  }
+  featureList();
+  list();
+  invalidate();
+  $('confirm-geometry').checked = true;
+  await $('build-solid').onclick();
+  if (!built) throw Error($('cad-status').textContent);
+  $('model-metrics').textContent = (result.assumptions.length || result.missing_views.length ? 'AI proposal · includes inferred geometry\n' : 'AI proposal\n') + $('model-metrics').textContent;
+  status('Gemini proposal built. Review inferred features and dimensions before export.');
+  return { built: true };
+}
+
+mountLocalFreecad({
+  viewer,
+  switchView,
+  updateTree,
+  getSketch: () => ({ profile: structuredClone(profile), circle: circleProfile ? structuredClone(circleProfile) : null, closed: profileClosed })
+});
+
+// Auto-start blank FreeCAD sketch so user can immediately draw
+newSketch();
