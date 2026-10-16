@@ -1,4 +1,5 @@
 import {mountGeminiPanel} from './gemini-panel.js';
+import {mountLocalFreecad} from './freecad-local.js';
 import {validateProposal} from './gemini-cad.js';
 import './cad-shell.js';
 import * as pdfjs from './vendor/pdf.mjs';
@@ -88,5 +89,7 @@ $('source-empty').innerHTML='<h2>Crop the views. Let Gemini reconstruct.</h2><p>
 const cropBar=document.createElement('div');cropBar.className='tool-group';for(const [label,id,action]of [['Pan','ai-pan',()=>{switchView('sketch');setTool('pan');}],['Crop view','ai-crop',()=>{switchView('sketch');full=true;fit();setTool('crop');}],['Full drawing','ai-full',()=>$('show-sheet').click()],['Rotate crop','ai-rotate',()=>$('rotate-crop').click()],['Flip crop','ai-flip',()=>$('flip-crop').click()],['Gemini','ai-tasks',()=>{document.querySelector('.cad-docks').classList.toggle('show-tasks');document.querySelector('.tasks-dock').scrollTop=0;}]]){const b=document.createElement('button');b.id=id;b.className='ai-toolbar-button'+(id==='ai-tasks'?' ai-start':'');b.textContent=label;b.onclick=action;cropBar.append(b);}document.querySelector('.cad-toolbar').append(cropBar);
 const panel=mountGeminiPanel({getCrops:()=>crops,setView:(id,face)=>{const c=crops.find(c=>c.id===id);if(c)c.face=face;list();syncFields();},setInclude:(id,value)=>{const c=crops.find(c=>c.id===id);if(c)c.aiInclude=value;},apply:applyGeminiProposal});
 export async function applyGeminiProposal(input){if(kernelBusy)throw Error('CAD kernel đang bận. Thử lại sau.');const result=validateProposal(input);lastAIProposal=result;remember();aiProposalMode=true;standalone=false;profile=result.spec.profile;circleProfile=result.spec.circle||null;profileClosed=true;holes=result.spec.holes;pockets=result.spec.pockets;$('model-height').value=result.spec.depth;$('edge-treatment').value=result.spec.fillet?'fillet':result.spec.chamfer?'chamfer':'none';$('edge-size').value=result.spec.fillet||result.spec.chamfer||.5;for(const a of result.view_assignments){const c=crops.find(c=>c.id===a.crop_id);if(c&&!c.face&&a.view!=='Unknown')c.face=a.view;}featureList();list();invalidate();$('confirm-geometry').checked=true;await $('build-solid').onclick();if(!built)throw Error($('cad-status').textContent);$('model-metrics').textContent=(result.assumptions.length||result.missing_views.length?'AI proposal · includes inferred geometry\n':'AI proposal\n')+$('model-metrics').textContent;status('Gemini proposal built. Review inferred features and dimensions before export.');return{built:true};}
+
+mountLocalFreecad({viewer,switchView,updateTree,getSketch:()=>({profile:structuredClone(profile),circle:circleProfile?structuredClone(circleProfile):null,closed:profileClosed})});
 
 updateTree();
