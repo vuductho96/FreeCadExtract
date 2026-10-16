@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import {mountCodeWorkspace} from './freecad-code.js';
+import {executionCode} from './freecad-code-model.js';
 const $=id=>document.getElementById(id);
 const text=(tag,value)=>Object.assign(document.createElement(tag),{textContent:value});
 const title=name=>name.replace(/^freecad_/,'').split('_').map(s=>s[0].toUpperCase()+s.slice(1)).join(' ');
@@ -175,5 +177,18 @@ export function mountLocalFreecad({viewer,switchView,getSketch,updateTree}){
     catch(e){health(e.message+' · Đồng bộ để kiểm tra các bước đã chạy.',true);throw e;}
     finally{busy=false;panel.inert=false;}
   }
-  return {refresh,runCommands,isConnected:()=>connected,disconnect:()=>$('fc-disconnect').click()};
+  async function runCode(code,options){
+    if(!connected)throw Error('Ghép nối FreeCAD trên máy này trước khi chạy Python.');
+    if(busy)throw Error('FreeCAD đang chạy một lệnh khác.');
+    const wrapped=executionCode(code,options);busy=true;panel.inert=true;
+    try{
+      const response=await call('freecad_execute_python',{code:wrapped},true);
+      const raw=response.content?.find(c=>c.type==='text')?.text;
+      let result;try{result=JSON.parse(raw);}catch{throw Error('Không đọc được kết quả script. Đồng bộ để kiểm tra FreeCAD.');}
+      try{await refresh();const solids=snapshot.objects.filter(o=>o.faces&&o.visible&&!o.parents.some(p=>snapshot.objects.find(x=>x.name===p)?.type==='PartDesign::Body'));result.model={solids:solids.reduce((sum,o)=>sum+o.solids,0),valid:solids.length>0&&solids.every(o=>o.valid),invalidFeatures:snapshot.objects.filter(o=>o.state.some(s=>/invalid|error/i.test(s))).map(o=>o.name)};}catch(e){result.syncError=e.message;}
+      return result;
+    }finally{busy=false;panel.inert=false;}
+  }
+  const codeWorkspace=mountCodeWorkspace({runCode,isConnected:()=>connected,connect:()=>dialog.showModal(),showModel:()=>{if(connected){activate(true);if(snapshot)renderScene();}else switchView('model');}});
+  return {refresh,runCommands,runCode,openCode:codeWorkspace.open,isConnected:()=>connected,disconnect:()=>$('fc-disconnect').click()};
 }

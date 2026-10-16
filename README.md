@@ -2,6 +2,14 @@
 
 Public browser application for extracting drawing dimensions and assisted 2D-to-3D reconstruction.
 
+## Copy Python → CAD
+
+Open `cad.html?workspace=code` or click **Dán code → 3D / CAD Code**. Copy the included prompt to ChatGPT with your drawing crops, paste its complete FreeCAD Python script into the editor, pair your local FreeCAD bridge and click **Chạy code → dựng CAD**. The editor accepts one Python Markdown code block or a `.py`/`.FCMacro` file, includes a constrained Sketch → Pad → Pocket example, and can download the source.
+
+Each click sends one script execution to the existing local bridge; it does not call an AI API. A new FreeCAD document is used by default. Python runs with the paired computer account's permissions. Print output, Python traceback, runtime and a BRep summary are shown; successful runs synchronize the live 3D viewport. Geometric validity does not establish drawing accuracy. Scripts/model data are not saved to cloud storage. Refreshing the tab discards the editor text unless downloaded.
+
+`node tests/freecad-code.mjs` checks input validation. Set `FREECAD_CMD` to an existing FreeCAD command path to additionally test native execution, fully constrained sketches, solid volume, FCStd/STEP roundtrip and error capture. On Windows the test uses the Python runtime bundled with that FreeCAD installation.
+
 ## Run locally
 
 Install Node.js, then run `npm ci` and `npm start`. Open http://127.0.0.1:5173.
